@@ -7,7 +7,7 @@ export class Store {
   sites: Site[]; accounts: Account[]; scope: Scope;
   private readonly groupSelections: Record<string, Group[]>;
   constructor(private readonly context: vscode.ExtensionContext) {
-    this.sites = context.globalState.get<Site[]>('sites') ?? [{ id: 'tulingsd', name: '图灵 · tulingsd.cn', url: 'http://tulingsd.cn', apiPath: '/api' }];
+    this.sites = context.globalState.get<Site[]>('sites', []);
     this.accounts = context.globalState.get<Account[]>('accounts', []);
     const saved = context.globalState.get<Scope>('scope');
     const site = this.sites.find(s => s.id === saved?.siteId) ?? this.sites[0];

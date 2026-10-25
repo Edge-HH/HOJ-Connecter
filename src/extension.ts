@@ -117,7 +117,7 @@ export class App implements vscode.Disposable, ViewModel {
   }
   private async siteForm(existing?: Site): Promise<Site | undefined> {
     const name = await vscode.window.showInputBox({ title: '站点名称', value: existing?.name, prompt: '例如：学校 OJ', validateInput: s => s.trim() ? undefined : '名称不能为空' }); if (name === undefined) { return; }
-    const url = await vscode.window.showInputBox({ title: 'OJ 网址', value: existing?.url ?? 'http://tulingsd.cn', validateInput: s => { try { normalizeSiteUrl(s); return undefined; } catch (e) { return (e as Error).message; } } }); if (url === undefined) { return; }
+    const url = await vscode.window.showInputBox({ title: 'OJ 网址', value: existing?.url, prompt: '例如：https://oj.example.com', validateInput: s => { try { normalizeSiteUrl(s); return undefined; } catch (e) { return (e as Error).message; } } }); if (url === undefined) { return; }
     const apiPath = await vscode.window.showInputBox({ title: 'API 前缀', value: existing?.apiPath ?? '/api', prompt: '标准 HOJ 为 /api；网址中的子路径会保留。', validateInput: s => { try { validateApiPath(s); return undefined; } catch (e) { return (e as Error).message; } } }); if (apiPath === undefined) { return; }
     return { id: existing?.id ?? randomUUID(), name: name.trim(), url: normalizeSiteUrl(url), apiPath: validateApiPath(apiPath) };
   }
@@ -380,7 +380,7 @@ export class App implements vscode.Disposable, ViewModel {
   private async enterContest(target?: { id: number; scope: Scope }): Promise<void> {
     if (target) { this.checkBrowseScope(target.scope); } let id = target?.id;
     if (!id) {
-      const input = await vscode.window.showInputBox({ title: '进入比赛', prompt: '输入比赛编号或网址，例如 2258 或 https://站点/contest/2258', validateInput: s => /^\d+$/.test(s.trim()) || /\/contest\/\d+/.test(s) ? undefined : '请输入比赛编号或包含 /contest/编号 的网址' });
+      const input = await vscode.window.showInputBox({ title: '进入比赛', prompt: '输入比赛编号或网址，例如 1001 或 https://站点/contest/1001', validateInput: s => /^\d+$/.test(s.trim()) || /\/contest\/\d+/.test(s) ? undefined : '请输入比赛编号或包含 /contest/编号 的网址' });
       if (!input) { return; } id = Number(input.trim().match(/^\d+$/)?.[0] ?? input.match(/\/contest\/(\d+)/)?.[1]);
     }
     if (!id || !Number.isSafeInteger(id)) { return; }

@@ -2,7 +2,7 @@
 
 在 VS Code 中使用 [Hcode Online Judge（HOJ）](https://github.com/HimitZH/HOJ)：浏览题目、进入团队和比赛、写代码、提交、查看结果及本地测试样例。
 
-默认站点是 [tulingsd.cn](http://tulingsd.cn/)。支持 VS Code 1.106 及以上，在 Windows、macOS、Linux 的桌面扩展宿主运行；也可在 Remote SSH / WSL 的工作区扩展宿主运行，此时文件、网络与编译器均位于远端。本项目为独立社区插件。
+插件不内置任何站点，首次使用时在侧栏点击“添加一个 HOJ 站点”填写 OJ 网址。支持 VS Code 1.106 及以上，在 Windows、macOS、Linux 的桌面扩展宿主运行；也可在 Remote SSH / WSL 的工作区扩展宿主运行，此时文件、网络与编译器均位于远端。本项目为独立社区插件。
 
 ## 安装
 
@@ -89,10 +89,10 @@
 
 ## 已验证范围
 
-- tulingsd.cn：公开题库分页、题目详情、语言列表、样例格式和公开比赛列表的只读检查。
+- 真实 HOJ 站点：公开题库分页、题目详情、语言列表、样例格式和公开比赛列表的只读检查。
 - 本地模拟 HOJ HTTP 服务：登录及 Token 续期、团队 / 比赛接口、提交体、评测轮询和 75 分结果、异常和重定向处理。
 - 真实 VS Code 扩展宿主：原生多级导航、侧栏题面与结果、打开题目不新增编辑标签、显式以文件打开、自动语言推荐与文件切换、样例文件和 Testing API 运行、模拟提交、团队比赛切换与文件隔离。
-- 使用用户授权的真实账号，只读验证 tulingsd.cn 比赛 2258：获取全部八道题（01–08），点击题目 01 可在侧栏读取真实题面与支持语言。测试账号只临时保存在隔离配置中，测试后移除；源码和安装包不含账号密码。
+- 使用用户授权的真实账号，只读验证真实站点上的比赛：获取完整题单，点击第一题可在侧栏读取真实题面与支持语言。测试账号只临时保存在隔离配置中，测试后移除；源码和安装包不含账号密码。
 - 进程执行：标准输入、带空格参数、非零退出、输出比较、超时、输出上限和取消。
 - AI 附加：在真实 VS Code 扩展宿主中用隔离的助手命令替身验证安装检测、按钮显示、题面与样例、错误信息、未保存代码和上下文快照；未向真实 AI 会话发送消息。
 
@@ -121,10 +121,10 @@ HOJ-Connecter/
 └─ CHANGELOG.md · LICENSE · THIRD_PARTY_NOTICES.md
 ```
 
-`test:live` 仅发送只读请求，默认检查 tulingsd.cn，可用 `HOJ_CONNECTER_SITE` 更改。Windows 可在 `pnpm test` 构建测试后执行 `powershell -ExecutionPolicy Bypass -File scripts/test-host.ps1`，在独立 VS Code 配置和临时工作区运行集成测试；可用 `-VSCodeExecutable` 指定安装位置。测试记录保留在 `.test-host/`。问题排查查看 **输出 → HOJ-Connecter**。
+`test:live` 仅发送只读请求，需用环境变量 `HOJ_CONNECTER_SITE` 指定要检查的站点地址，未设置时直接退出。Windows 可在 `pnpm test` 构建测试后执行 `powershell -ExecutionPolicy Bypass -File scripts/test-host.ps1`，在独立 VS Code 配置和临时工作区运行集成测试；可用 `-VSCodeExecutable` 指定安装位置。测试记录保留在 `.test-host/`。问题排查查看 **输出 → HOJ-Connecter**。
 
 附加 `-AssistantFixtures` 可加载隔离的 Codex / Claude 命令替身，验证安装检测、按钮、错误上下文、未保存代码及两种附加方式，不连接真实 AI 会话。
 
-授权的真实账号验证使用 `-TestSuite live-host.test.js`，从临时环境变量 `HOJ_CONNECTER_LIVE_USERNAME` / `HOJ_CONNECTER_LIVE_PASSWORD` 读取凭据，只验证题单与题面，不会提交代码。
+授权的真实账号验证使用 `-TestSuite live-host.test.js`，从临时环境变量 `HOJ_CONNECTER_SITE`、`HOJ_CONNECTER_LIVE_CONTEST`（比赛编号）、`HOJ_CONNECTER_LIVE_USERNAME` / `HOJ_CONNECTER_LIVE_PASSWORD` 读取站点与凭据，只验证题单与题面，不会提交代码。
 
 接口适配依据 [HOJ 上游前端 API](https://github.com/HimitZH/HOJ/blob/master/hoj-vue/src/common/api.js) 与后端数据结构。导航、选择、文件编辑和测试使用 VS Code 原生 API；富文本题面与结果在侧栏 WebviewView 中只读渲染，使用 VS Code 主题变量，Markdown 与公式资源均随安装包提供，无外部脚本或 CDN。

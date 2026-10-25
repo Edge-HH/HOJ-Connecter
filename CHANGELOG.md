@@ -7,6 +7,7 @@
 - 命令、设置、上下文键和视图 ID 的前缀由 `hcode.` 改为 `hoj-connecter.`，例如 `hcode.runners` → `hoj-connecter.runners`、`hcode.solutionDirectory` → `hoj-connecter.solutionDirectory`。如已在 `settings.json` 或 `keybindings.json` 中使用旧名称，请同步修改。
 - 工作区数据目录由 `.hcode/` 改为 `.hoj-connecter/`（其中的 `solutions/`、`samples/`、`ai-context/`）。已有文件可手动移动，或把 `hoj-connecter.solutionDirectory` 设为 `.hcode/solutions` 继续使用原目录。
 - 开发用环境变量更名：`HCODE_SITE` → `HOJ_CONNECTER_SITE`，`HCODE_LIVE_USERNAME` / `HCODE_LIVE_PASSWORD` → `HOJ_CONNECTER_LIVE_USERNAME` / `HOJ_CONNECTER_LIVE_PASSWORD`。
+- 不再内置默认站点：首次使用时站点列表为空，添加站点时网址输入框不预填；`test:live` 与 `live-host.test.js` 必须通过 `HOJ_CONNECTER_SITE`（及 `HOJ_CONNECTER_LIVE_CONTEST`）指定站点和比赛。
 - 整理仓库：新增 `.gitattributes`（统一 LF 换行），`package.json` 补充 `repository`、`homepage`、`bugs`，打包命令不再需要 `--allow-missing-repository`。
 
 ## 0.6.0
@@ -67,7 +68,7 @@
 - 题面、比赛信息、远程结果与本地样例结果默认显示在侧栏，支持公式与表格；仅“以文件打开”进入编辑区。
 - 根据代码文件、编辑器语言与题目允许的语言推荐提交语言，切换文件时更新；支持手动覆盖。
 - 测试、导入样例和查看结果保留代码编辑位置；只有当前关联文件显示编辑器提交和测试入口。
-- 已用真实账号只读验证 tulingsd.cn 比赛 2258 的八题题单和题面。
+- 已用真实账号只读验证真实站点比赛的题单和题面。
 
 ## 0.1.0
 
