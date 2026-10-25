@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-tests/
+out/
+*.vsix
+.hoj-connecter/
+.test-host/
+media/katex/

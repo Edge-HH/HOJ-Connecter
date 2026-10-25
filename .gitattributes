@@ -1,0 +1,7 @@
+# Keep line endings consistent (LF) in the repository and in checkouts on every platform.
+* text=auto eol=lf
+
+*.vsix binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

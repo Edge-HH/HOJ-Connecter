@@ -1,0 +1,736 @@
+{
+  "name": "hoj-connecter",
+  "displayName": "HOJ-Connecter · 原生题库与比赛",
+  "description": "在 VS Code 原生侧栏中连接 HOJ：多站点与账号、团队和比赛、题目文件、提交评测及本地样例测试。",
+  "version": "0.6.0",
+  "publisher": "edge-hh",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Edge-HH/HOJ-Connecter.git"
+  },
+  "homepage": "https://github.com/Edge-HH/HOJ-Connecter#readme",
+  "bugs": {
+    "url": "https://github.com/Edge-HH/HOJ-Connecter/issues"
+  },
+  "engines": {
+    "vscode": "^1.106.0"
+  },
+  "categories": [
+    "Education",
+    "Other"
+  ],
+  "keywords": [
+    "hcode",
+    "hoj",
+    "oj",
+    "competitive programming"
+  ],
+  "main": "./dist/extension.js",
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "可以浏览题目；本地运行和提交代码需要受信任的工作区。"
+    },
+    "virtualWorkspaces": false
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "check": "tsc --noEmit",
+    "test": "node scripts/build.mjs --test && node --test dist-tests/core.test.js",
+    "test:live": "node scripts/live-smoke.mjs",
+    "package": "node scripts/build.mjs && vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/katex": "^0.16.8",
+    "@types/markdown-it": "^14.2.0",
+    "@types/node": "^22.0.0",
+    "@types/turndown": "^5.0.5",
+    "@types/vscode": "~1.95.0",
+    "@vscode/vsce": "^3.6.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.8.0"
+  },
+  "dependencies": {
+    "katex": "^0.19.0",
+    "markdown-it": "^15.0.3",
+    "turndown": "^7.2.0"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "hoj-connecter",
+          "title": "HOJ-Connecter",
+          "icon": "media/hoj-connecter.svg"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "hoj-connecter-reader",
+          "title": "HOJ-Connecter 题面与结果",
+          "icon": "$(book)"
+        }
+      ]
+    },
+    "views": {
+      "hoj-connecter": [
+        {
+          "id": "hoj-connecter.navigation",
+          "name": "OJ 导航"
+        }
+      ],
+      "hoj-connecter-reader": [
+        {
+          "id": "hoj-connecter.details",
+          "name": "题面与结果",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "hoj-connecter.addSite",
+        "title": "添加站点",
+        "category": "HOJ-Connecter",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hoj-connecter.editSite",
+        "title": "编辑站点",
+        "category": "HOJ-Connecter",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "hoj-connecter.removeSite",
+        "title": "删除站点",
+        "category": "HOJ-Connecter",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "hoj-connecter.switchSite",
+        "title": "切换站点",
+        "category": "HOJ-Connecter",
+        "icon": "$(globe)"
+      },
+      {
+        "command": "hoj-connecter.login",
+        "title": "添加账号 / 重新登录",
+        "category": "HOJ-Connecter",
+        "icon": "$(sign-in)"
+      },
+      {
+        "command": "hoj-connecter.relogin",
+        "title": "重新登录",
+        "category": "HOJ-Connecter",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "hoj-connecter.importToken",
+        "title": "通过浏览器 Token 登录",
+        "category": "HOJ-Connecter"
+      },
+      {
+        "command": "hoj-connecter.switchAccount",
+        "title": "切换账号 / 游客",
+        "category": "HOJ-Connecter",
+        "icon": "$(account)"
+      },
+      {
+        "command": "hoj-connecter.removeAccount",
+        "title": "移除账号",
+        "category": "HOJ-Connecter",
+        "icon": "$(sign-out)"
+      },
+      {
+        "command": "hoj-connecter.refresh",
+        "title": "刷新",
+        "category": "HOJ-Connecter",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "hoj-connecter.showRank",
+        "title": "排行榜",
+        "category": "HOJ-Connecter",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "hoj-connecter.filterSubmissions",
+        "title": "筛选提交",
+        "category": "HOJ-Connecter",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "hoj-connecter.problemSubmissions",
+        "title": "查看本题全部提交",
+        "category": "HOJ-Connecter",
+        "icon": "$(history)"
+      },
+      {
+        "command": "hoj-connecter.previousPage",
+        "title": "上一页",
+        "category": "HOJ-Connecter",
+        "icon": "$(chevron-left)"
+      },
+      {
+        "command": "hoj-connecter.nextPage",
+        "title": "下一页",
+        "category": "HOJ-Connecter",
+        "icon": "$(chevron-right)"
+      },
+      {
+        "command": "hoj-connecter.jumpPage",
+        "title": "跳转到页…",
+        "category": "HOJ-Connecter",
+        "icon": "$(list-selection)"
+      },
+      {
+        "command": "hoj-connecter.morePage",
+        "title": "加载更多",
+        "category": "HOJ-Connecter",
+        "icon": "$(chevron-down)"
+      },
+      {
+        "command": "hoj-connecter.searchProblems",
+        "title": "搜索题目",
+        "category": "HOJ-Connecter",
+        "icon": "$(search)"
+      },
+      {
+        "command": "hoj-connecter.openProblemById",
+        "title": "按编号打开题目",
+        "category": "HOJ-Connecter",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "hoj-connecter.openProblem",
+        "title": "打开题目",
+        "category": "HOJ-Connecter"
+      },
+      {
+        "command": "hoj-connecter.enterGroup",
+        "title": "选择团队（可多选）",
+        "category": "HOJ-Connecter",
+        "icon": "$(organization)"
+      },
+      {
+        "command": "hoj-connecter.addGroup",
+        "title": "按编号添加团队",
+        "category": "HOJ-Connecter",
+        "icon": "$(add)"
+      },
+      {
+        "command": "hoj-connecter.enterContest",
+        "title": "进入 / 切换比赛",
+        "category": "HOJ-Connecter",
+        "icon": "$(calendar)"
+      },
+      {
+        "command": "hoj-connecter.registerContest",
+        "title": "输入比赛密码",
+        "category": "HOJ-Connecter",
+        "icon": "$(key)"
+      },
+      {
+        "command": "hoj-connecter.leaveContext",
+        "title": "返回公共题单",
+        "category": "HOJ-Connecter",
+        "icon": "$(home)"
+      },
+      {
+        "command": "hoj-connecter.leaveContest",
+        "title": "退出比赛，返回团队 / 题库",
+        "category": "HOJ-Connecter",
+        "icon": "$(arrow-left)"
+      },
+      {
+        "command": "hoj-connecter.contestInfo",
+        "title": "查看当前比赛信息与时间",
+        "category": "HOJ-Connecter",
+        "icon": "$(clock)"
+      },
+      {
+        "command": "hoj-connecter.newSolution",
+        "title": "新建题目文件",
+        "category": "HOJ-Connecter",
+        "icon": "$(new-file)"
+      },
+      {
+        "command": "hoj-connecter.bindActiveFile",
+        "title": "使用当前文件作为题目文件",
+        "category": "HOJ-Connecter",
+        "icon": "$(link)"
+      },
+      {
+        "command": "hoj-connecter.switchSolution",
+        "title": "切换题目文件",
+        "category": "HOJ-Connecter",
+        "icon": "$(files)"
+      },
+      {
+        "command": "hoj-connecter.openSolution",
+        "title": "打开题目文件",
+        "category": "HOJ-Connecter",
+        "icon": "$(file-code)"
+      },
+      {
+        "command": "hoj-connecter.selectLanguage",
+        "title": "选择提交语言",
+        "category": "HOJ-Connecter",
+        "icon": "$(code)"
+      },
+      {
+        "command": "hoj-connecter.fetchLastAcceptedCode",
+        "title": "获取最后一次通过的代码",
+        "category": "HOJ-Connecter",
+        "icon": "$(cloud-download)",
+        "enablement": "hoj-connecter.hasProblemFile && hoj-connecter.loggedIn && isWorkspaceTrusted"
+      },
+      {
+        "command": "hoj-connecter.resetToTemplate",
+        "title": "重置为模板",
+        "category": "HOJ-Connecter",
+        "icon": "$(discard)",
+        "enablement": "hoj-connecter.hasProblemFile && isWorkspaceTrusted"
+      },
+      {
+        "command": "hoj-connecter.submit",
+        "title": "提交当前题目",
+        "category": "HOJ-Connecter",
+        "icon": "$(cloud-upload)"
+      },
+      {
+        "command": "hoj-connecter.openSubmission",
+        "title": "查看提交结果",
+        "category": "HOJ-Connecter"
+      },
+      {
+        "command": "hoj-connecter.importSamples",
+        "title": "一键填入样例",
+        "category": "HOJ-Connecter",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "hoj-connecter.configureRunner",
+        "title": "选择 / 配置本地编译器",
+        "category": "HOJ-Connecter",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "hoj-connecter.testSamples",
+        "title": "一键测试样例",
+        "category": "HOJ-Connecter",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "hoj-connecter.openInBrowser",
+        "title": "在浏览器打开当前题目 / 比赛",
+        "category": "HOJ-Connecter",
+        "icon": "$(link-external)"
+      },
+      {
+        "command": "hoj-connecter.showNavigation",
+        "title": "显示题库 / 比赛题单",
+        "category": "HOJ-Connecter"
+      },
+      {
+        "command": "hoj-connecter.showProblem",
+        "title": "在右侧栏查看题面",
+        "category": "HOJ-Connecter",
+        "icon": "$(book)"
+      },
+      {
+        "command": "hoj-connecter.openDetailAsFile",
+        "title": "以文件打开当前内容",
+        "category": "HOJ-Connecter",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "hoj-connecter.openProblemAsFile",
+        "title": "以文件打开题面",
+        "category": "HOJ-Connecter",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "hoj-connecter.openResultAsFile",
+        "title": "以文件打开结果",
+        "category": "HOJ-Connecter",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "hoj-connecter.attachToCodex",
+        "title": "附加到 Codex",
+        "category": "HOJ-Connecter",
+        "enablement": "hoj-connecter.canAttachToCodex"
+      },
+      {
+        "command": "hoj-connecter.attachToClaude",
+        "title": "附加到 Claude",
+        "category": "HOJ-Connecter",
+        "enablement": "hoj-connecter.canAttachToClaude"
+      },
+      {
+        "command": "hoj-connecter.attachToCopilot",
+        "title": "附加到 Copilot",
+        "category": "HOJ-Connecter",
+        "enablement": "hoj-connecter.canAttachToCopilot"
+      },
+      {
+        "command": "hoj-connecter.showTests",
+        "title": "显示原生测试面板",
+        "category": "HOJ-Connecter",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "hoj-connecter.restoreSidebar",
+        "title": "恢复题面侧栏（右侧）",
+        "category": "HOJ-Connecter",
+        "icon": "$(layout-sidebar-right)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "hoj-connecter.showRank",
+          "when": "view == hoj-connecter.navigation",
+          "group": "navigation@3"
+        },
+        {
+          "command": "hoj-connecter.searchProblems",
+          "when": "view == hoj-connecter.navigation",
+          "group": "navigation@1"
+        },
+        {
+          "command": "hoj-connecter.refresh",
+          "when": "view == hoj-connecter.navigation",
+          "group": "navigation@9"
+        },
+        {
+          "command": "hoj-connecter.addSite",
+          "when": "view == hoj-connecter.navigation",
+          "group": "manage@1"
+        },
+        {
+          "command": "hoj-connecter.login",
+          "when": "view == hoj-connecter.navigation",
+          "group": "manage@2"
+        },
+        {
+          "command": "hoj-connecter.configureRunner",
+          "when": "view == hoj-connecter.navigation",
+          "group": "manage@3"
+        },
+        {
+          "command": "hoj-connecter.openProblemById",
+          "when": "view == hoj-connecter.navigation",
+          "group": "open@1"
+        },
+        {
+          "command": "hoj-connecter.enterContest",
+          "when": "view == hoj-connecter.navigation",
+          "group": "open@2"
+        },
+        {
+          "command": "hoj-connecter.enterGroup",
+          "when": "view == hoj-connecter.navigation",
+          "group": "open@3"
+        },
+        {
+          "command": "hoj-connecter.leaveContest",
+          "when": "view == hoj-connecter.navigation && hoj-connecter.inContest",
+          "group": "scope@1"
+        },
+        {
+          "command": "hoj-connecter.leaveContext",
+          "when": "view == hoj-connecter.navigation && hoj-connecter.inGroup",
+          "group": "scope@2"
+        },
+        {
+          "command": "hoj-connecter.openDetailAsFile",
+          "when": "view == hoj-connecter.details && hoj-connecter.hasDetail",
+          "group": "navigation@2"
+        },
+        {
+          "command": "hoj-connecter.showProblem",
+          "when": "view == hoj-connecter.details && hoj-connecter.hasProblem",
+          "group": "navigation@1"
+        },
+        {
+          "command": "hoj-connecter.restoreSidebar",
+          "when": "view == hoj-connecter.navigation || view == hoj-connecter.details",
+          "group": "layout@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "hoj-connecter.editSite",
+          "when": "viewItem == hoj-connecter.site",
+          "group": "inline@1"
+        },
+        {
+          "command": "hoj-connecter.removeSite",
+          "when": "viewItem == hoj-connecter.site",
+          "group": "manage@1"
+        },
+        {
+          "command": "hoj-connecter.relogin",
+          "when": "viewItem == hoj-connecter.account",
+          "group": "inline@1"
+        },
+        {
+          "command": "hoj-connecter.relogin",
+          "when": "viewItem == hoj-connecter.account",
+          "group": "manage@0"
+        },
+        {
+          "command": "hoj-connecter.removeAccount",
+          "when": "viewItem == hoj-connecter.account",
+          "group": "manage@1"
+        },
+        {
+          "command": "hoj-connecter.submit",
+          "when": "viewItem == hoj-connecter.current && hoj-connecter.loggedIn",
+          "group": "inline@1"
+        },
+        {
+          "command": "hoj-connecter.testSamples",
+          "when": "viewItem == hoj-connecter.current",
+          "group": "inline@2"
+        },
+        {
+          "command": "hoj-connecter.newSolution",
+          "when": "viewItem == hoj-connecter.current",
+          "group": "file@1"
+        },
+        {
+          "command": "hoj-connecter.bindActiveFile",
+          "when": "viewItem == hoj-connecter.current",
+          "group": "file@2"
+        },
+        {
+          "command": "hoj-connecter.openProblemAsFile",
+          "when": "viewItem == hoj-connecter.current",
+          "group": "file@3"
+        },
+        {
+          "command": "hoj-connecter.fetchLastAcceptedCode",
+          "when": "viewItem == hoj-connecter.current && hoj-connecter.hasProblemFile",
+          "group": "code@1"
+        },
+        {
+          "command": "hoj-connecter.resetToTemplate",
+          "when": "viewItem == hoj-connecter.current && hoj-connecter.hasProblemFile",
+          "group": "code@2"
+        },
+        {
+          "command": "hoj-connecter.searchProblems",
+          "when": "viewItem =~ /hoj-connecter[.]problemList/",
+          "group": "inline@1"
+        },
+        {
+          "command": "hoj-connecter.filterSubmissions",
+          "when": "viewItem =~ /hoj-connecter[.]submissions/",
+          "group": "inline@1"
+        },
+        {
+          "command": "hoj-connecter.problemSubmissions",
+          "when": "viewItem == hoj-connecter.current",
+          "group": "code@3"
+        },
+        {
+          "command": "hoj-connecter.previousPage",
+          "when": "viewItem =~ /hoj-connecter[.]paged[.]prev/",
+          "group": "inline@7"
+        },
+        {
+          "command": "hoj-connecter.jumpPage",
+          "when": "viewItem =~ /hoj-connecter[.]paged[.]jump/",
+          "group": "inline@8"
+        },
+        {
+          "command": "hoj-connecter.nextPage",
+          "when": "viewItem =~ /hoj-connecter[.]paged[.]next/",
+          "group": "inline@9"
+        },
+        {
+          "command": "hoj-connecter.switchSite",
+          "when": "viewItem == hoj-connecter.session",
+          "group": "inline@1"
+        },
+        {
+          "command": "hoj-connecter.switchAccount",
+          "when": "viewItem == hoj-connecter.session",
+          "group": "inline@2"
+        },
+        {
+          "command": "hoj-connecter.relogin",
+          "when": "viewItem == hoj-connecter.session && hoj-connecter.loggedIn",
+          "group": "inline@3"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "hoj-connecter.fetchLastAcceptedCode",
+          "when": "hoj-connecter.isProblemFile && resourceScheme == file",
+          "group": "code@1"
+        },
+        {
+          "command": "hoj-connecter.resetToTemplate",
+          "when": "hoj-connecter.isProblemFile && resourceScheme == file",
+          "group": "code@2"
+        },
+        {
+          "command": "hoj-connecter.submit",
+          "when": "hoj-connecter.isProblemFile && resourceScheme == file",
+          "group": "navigation@8"
+        },
+        {
+          "command": "hoj-connecter.testSamples",
+          "when": "hoj-connecter.isProblemFile && resourceScheme == file",
+          "group": "navigation@9"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "hoj-connecter.submit",
+        "key": "ctrl+alt+enter",
+        "mac": "cmd+alt+enter",
+        "when": "hoj-connecter.isProblemFile && editorTextFocus"
+      },
+      {
+        "command": "hoj-connecter.testSamples",
+        "key": "ctrl+alt+t",
+        "mac": "cmd+alt+t",
+        "when": "hoj-connecter.isProblemFile && editorTextFocus"
+      }
+    ],
+    "configuration": {
+      "title": "HOJ-Connecter",
+      "properties": {
+        "hoj-connecter.solutionDirectory": {
+          "type": "string",
+          "scope": "resource",
+          "default": ".hoj-connecter/solutions",
+          "description": "题目文件目录，相对于工作区文件夹。"
+        },
+        "hoj-connecter.defaultLanguage": {
+          "type": "string",
+          "default": "C++",
+          "description": "优先选择的 HOJ 语言名称（匹配站点实际提供的语言）。"
+        },
+        "hoj-connecter.paginationMode": {
+          "type": "string",
+          "enum": ["append", "page"],
+          "enumDescriptions": ["列表末尾“加载更多”，在已显示内容后追加下一页", "整页替换，用“上一页 / 下一页”切换"],
+          "default": "append",
+          "description": "题库、团队、比赛和提交列表的翻页方式。列表标题行始终提供上一页 / 跳转 / 下一页按钮。"
+        },
+        "hoj-connecter.pageSize": {
+          "type": "integer",
+          "default": 30,
+          "minimum": 5,
+          "maximum": 100,
+          "description": "题库、团队和比赛每页显示数量。"
+        },
+        "hoj-connecter.requestTimeoutMs": {
+          "type": "integer",
+          "default": 20000,
+          "minimum": 1000,
+          "maximum": 120000,
+          "description": "网络请求超时。"
+        },
+        "hoj-connecter.pollIntervalMs": {
+          "type": "integer",
+          "default": 1500,
+          "minimum": 500,
+          "maximum": 10000,
+          "description": "提交结果轮询间隔。"
+        },
+        "hoj-connecter.pollTimeoutSeconds": {
+          "type": "integer",
+          "default": 180,
+          "minimum": 10,
+          "maximum": 600,
+          "description": "自动等待评测结果的最长时间；超时后可手动刷新。"
+        },
+        "hoj-connecter.sampleTimeoutMs": {
+          "type": "integer",
+          "scope": "resource",
+          "default": 5000,
+          "minimum": 100,
+          "maximum": 60000,
+          "description": "单个本地样例运行时限。"
+        },
+        "hoj-connecter.compileTimeoutMs": {
+          "type": "integer",
+          "scope": "resource",
+          "default": 30000,
+          "minimum": 1000,
+          "maximum": 120000,
+          "description": "本地编译时限。"
+        },
+        "hoj-connecter.outputLimitKb": {
+          "type": "integer",
+          "scope": "resource",
+          "default": 1024,
+          "minimum": 16,
+          "maximum": 16384,
+          "description": "本地进程 stdout 和 stderr 合计输出上限。"
+        },
+        "hoj-connecter.sampleComparison": {
+          "type": "string",
+          "scope": "resource",
+          "enum": [
+            "trimEnd",
+            "tokens",
+            "exact"
+          ],
+          "default": "trimEnd",
+          "description": "trimEnd 忽略行尾空格和末尾换行；tokens 忽略所有空白差异；exact 严格比较（统一 CRLF）。"
+        },
+        "hoj-connecter.runners": {
+          "type": "object",
+          "scope": "resource",
+          "restricted": true,
+          "default": {},
+          "description": "按文件扩展名覆盖本地运行器；留空时自动检测已安装的工具。可通过“HOJ-Connecter: 选择 / 配置本地编译器”选择程序并保存。支持 ${file}、${dir}、${output}、${buildDir}、${stem}；参数直接传给进程，不经过 shell。",
+          "additionalProperties": {
+            "type": "object",
+            "required": [
+              "run"
+            ],
+            "properties": {
+              "compile": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "run": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "msvc": {
+                "type": "string",
+                "description": "MSVC 的 vcvarsall.bat 路径；设置后编译和运行使用 Developer Command Prompt 环境。"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    }
+  }
+}

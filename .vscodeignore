@@ -1,0 +1,16 @@
+src/**
+test/**
+scripts/**
+node_modules/**
+dist-tests/**
+out/**
+.test-host/**
+.vscode/**
+.hoj-connecter/**
+.gitignore
+.gitattributes
+tsconfig.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+**/*.map
+**/*.vsix

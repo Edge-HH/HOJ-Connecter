@@ -1,0 +1,24 @@
+:root { color-scheme: light dark; }
+body { color: var(--vscode-foreground); background: var(--vscode-sideBar-background); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); line-height: 1.6; margin: 0; overflow-wrap: anywhere; }
+header { position: sticky; top: 0; z-index: 2; background: var(--vscode-sideBar-background); display: flex; align-items: center; gap: 6px; justify-content: space-between; padding: 5px 9px; border-bottom: 1px solid var(--vscode-panel-border); }
+nav { display: flex; gap: 2px; }
+button { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: 1px solid transparent; border-radius: 2px; padding: 4px 7px; cursor: pointer; font: inherit; font-size: 12px; }
+button:hover { background: var(--vscode-button-secondaryHoverBackground); }
+button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+.tab, .file { background: transparent; color: var(--vscode-descriptionForeground); white-space: nowrap; }
+.tab.selected { color: var(--vscode-foreground); border-bottom-color: var(--vscode-focusBorder); }
+main { padding: 4px 13px 14px; }
+h1 { font-size: 1.35em; line-height: 1.45; margin-top: 12px; }
+h2 { font-size: 1.13em; border-top: 1px solid var(--vscode-panel-border); padding-top: 12px; margin-top: 20px; }
+h3 { font-size: 1em; }
+p { margin: 10px 0; }
+pre { background: var(--vscode-textCodeBlock-background); border: 1px solid var(--vscode-panel-border); border-radius: 3px; padding: 9px; overflow: auto; overflow-wrap: normal; }
+code { font-family: var(--vscode-editor-font-family); font-size: .95em; }
+a { color: var(--vscode-textLink-foreground); }
+img { max-width: 100%; }
+table { display: block; overflow-x: auto; border-collapse: collapse; }
+th, td { border: 1px solid var(--vscode-panel-border); padding: 5px 8px; }
+blockquote { border-left: 3px solid var(--vscode-textBlockQuote-border); padding-left: 10px; margin-left: 0; color: var(--vscode-descriptionForeground); }
+.math-block, .katex-display { overflow-x: auto; overflow-y: hidden; }
+.empty { color: var(--vscode-descriptionForeground); padding-top: 15px; }
+footer { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px; background: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-panel-border); }
