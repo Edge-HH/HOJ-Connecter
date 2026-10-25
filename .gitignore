@@ -1,8 +1,35 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 dist-tests/
 out/
-*.vsix
-.hoj-connecter/
-.test-host/
 media/katex/
+*.map
+
+# Packaged extensions
+*.vsix
+releases/
+
+# Test and runtime data
+.test-host/
+.hoj-connecter/
+.vscode-test/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
