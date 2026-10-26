@@ -41,7 +41,7 @@ test('HOJ session, pagination, team/contest routing, submit identity and score u
     assert.equal(result.caseResult?.judgeCaseList?.length, 4);
     assert.equal(result.caseResult?.judgeCaseList?.[2].userOutput, 'wrong answer: expected 42, found 41');
     assert.equal(mock.requests.at(-1)!.query.get('submitId'), '42'); assert.equal(mock.requests.at(-1)!.authorization, 'token-alice');
-    await client.submissions(scope, 'A', 1, 30); assert.equal(mock.requests.at(-1)!.query.get('contestID'), '12'); assert.equal(mock.requests.at(-1)!.query.get('problemID'), 'A');
+    await client.submissions(scope, 'A', 1, 30); assert.equal(mock.requests.at(-1)!.query.get('contestID'), '12'); assert.equal(mock.requests.at(-1)!.query.get('problemID'), 'A'); assert.equal(mock.requests.at(-1)!.query.get('beforeContestSubmit'), 'false');
     assert.equal(mock.requests.at(-1)!.query.get('onlyMine'), 'true'); assert.equal(mock.requests.at(-1)!.query.has('status'), false);
     await client.submissions(scope, 'A', 2, 30, { onlyMine: false, status: 0, username: 'bob' });
     const all = mock.requests.at(-1)!.query;

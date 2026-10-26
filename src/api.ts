@@ -165,7 +165,7 @@ export class HojClient {
     return data;
   }
   async submissions(scope: Scope, displayId: string | undefined, page: number, limit: number, filter: SubmissionFilter = { onlyMine: true }): Promise<Page<Submission>> {
-    return asPage((await this.request<Page<Submission>>(scope.contestId ? '/contest-submissions' : '/get-submission-list', { currentPage: page, limit, onlyMine: filter.onlyMine, problemID: displayId, completeProblemID: true, contestID: scope.contestId ?? 0, gid: scope.groupId, status: filter.status, username: filter.onlyMine ? undefined : filter.username })).data);
+    return asPage((await this.request<Page<Submission>>(scope.contestId ? '/contest-submissions' : '/get-submission-list', { currentPage: page, limit, onlyMine: filter.onlyMine, problemID: displayId, completeProblemID: true, contestID: scope.contestId ?? 0, beforeContestSubmit: scope.contestId ? false : undefined, gid: scope.groupId, status: filter.status, username: filter.onlyMine ? undefined : filter.username })).data);
   }
 }
 interface OpenProblemForSubmit { displayId: string; scope: Scope; detail: ProblemDetail }
