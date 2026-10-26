@@ -450,6 +450,8 @@ export class App implements vscode.Disposable, ViewModel {
             }
             if (!isPending(result.status)) {
               this.output.appendLine(`#${id} · ${verdict(result.status)} ${scoreText(result)} · ${result.time ?? '?'} ms`);
+              // Problem rows show the account's latest verdict.
+              this.views.problems.refresh(); this.navigation.refreshLists();
               void vscode.window.showInformationMessage(`${displayId} · #${id} · ${verdict(result.status)} ${scoreText(result)}`); return;
             }
             await new Promise<void>(resolve => {

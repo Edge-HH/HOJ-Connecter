@@ -1,4 +1,4 @@
-import { Account, asPage, Contest, ContestRankRow, RankRow, SubmissionFilter, Group, isPending, JudgeCase, JudgeCaseResult, Page, ProblemDetail, ProblemSummary, Scope, Site, Submission } from './domain';
+import { Account, asPage, Contest, ContestRankRow, RankRow, SubmissionFilter, Group, isPending, JudgeCase, JudgeCaseResult, Page, ProblemDetail, ProblemStatus, ProblemSummary, Scope, Site, Submission } from './domain';
 
 export interface Secrets { get(key: string): Thenable<string | undefined> | Promise<string | undefined>; store(key: string, value: string): Thenable<void> | Promise<void> }
 export interface AcceptedCode { code: string; language?: string }
@@ -97,6 +97,11 @@ export class HojClient {
   async problems(scope: Scope, page: number, limit: number, keyword = ''): Promise<Page<ProblemSummary>> {
     if (scope.contestId) { return asPage((await this.request<ProblemSummary[]>('/get-contest-problem', { cid: scope.contestId, containsEnd: true })).data); }
     return asPage((await this.request<Page<ProblemSummary>>(scope.groupId ? '/group/get-problem-list' : '/get-problem-list', { currentPage: page, limit, gid: scope.groupId, keyword })).data);
+  }
+  /** Current account's status per numeric problem ID; empty for guests. */
+  async problemStatus(scope: Scope, pids: readonly number[]): Promise<Record<string, ProblemStatus>> {
+    if (!this.account || !pids.length) { return {}; }
+    return (await this.request<Record<string, ProblemStatus> | null>('/get-user-problem-status', {}, { pidList: pids, isContestProblemList: !!scope.contestId, cid: scope.contestId, gid: scope.groupId, containsEnd: true })).data ?? {};
   }
   async problem(scope: Scope, displayId: string): Promise<ProblemDetail> {
     const endpoint = scope.contestId ? '/get-contest-problem-details' : '/get-problem-detail';

@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { Contest, contestClock, Group, OpenProblem, ProblemSummary, problemId, problemTitle, Scope, SubmissionFilter, verdict, scoreText } from './domain';
+import { Contest, contestClock, Group, isPending, OpenProblem, ProblemStatus, ProblemSummary, problemId, problemTitle, Scope, SubmissionFilter, verdict, verdictCode, scoreText } from './domain';
 import { ApiError } from './api';
 import { Store } from './store';
 import { Files } from './files';
@@ -10,6 +10,14 @@ export interface ViewModel {
   store: Store; files: Files; current?: OpenProblem; group?: Group; contest?: Contest; serverOffset: number;
   keyword: string; revision: number; report(error: unknown, notify?: boolean): void;
   selectGroups(groups: readonly Group[], scope: Scope): Promise<void>;
+}
+const verdictColors: Record<number, string> = { 0: 'testing.iconPassed', '-1': 'testing.iconFailed', '-3': 'testing.iconFailed', 1: 'charts.orange', 2: 'charts.orange', 3: 'charts.purple', '-2': 'charts.yellow', 8: 'charts.blue', 4: 'problemsWarningIcon.foreground', 10: 'problemsWarningIcon.foreground' };
+/** Green check for AC, a spinner while judging, otherwise a dot in the verdict's color. */
+export function verdictIcon(status: number): vscode.ThemeIcon {
+  if (status === 0) { return new vscode.ThemeIcon('pass-filled', new vscode.ThemeColor(verdictColors[0])); }
+  if (isPending(status)) { return new vscode.ThemeIcon('sync~spin'); }
+  const color = verdictColors[status];
+  return color ? new vscode.ThemeIcon('error', new vscode.ThemeColor(color)) : new vscode.ThemeIcon('circle-outline');
 }
 export class Node extends vscode.TreeItem {
   constructor(label: string, command?: string, readonly value?: unknown, icon?: string, description?: string) {
@@ -110,17 +118,26 @@ export class Explorer implements vscode.TreeDataProvider<Node>, vscode.Disposabl
     const client = store.client(scope), limit = this.limit = vscode.workspace.getConfiguration('hoj-connecter').get('pageSize', 30);
     if (this.name === 'problems') {
       this.message = `${scope.contestId ? `比赛：${m.contest?.title}` : scope.groupId ? `团队：${store.selectedGroups.find(g => g.id === scope.groupId)?.name}` : '公共题单'}${keyword ? ` · ${scope.groupId && !scope.contestId ? '当前页筛选：' : ''}${keyword}` : ''}`;
-      const problemNodes = (records: ProblemSummary[]) => records.map(p => {
-        const node = new Node(`${problemId(p)} · ${problemTitle(p)}`, 'hoj-connecter.openProblem', { displayId: problemId(p), scope }, 'symbol-method', p.score == null ? undefined : `${p.score} 分`);
-        node.contextValue = 'hoj-connecter.problem'; return node;
-      });
+      const problemNodes = async (records: ProblemSummary[]) => {
+        const pids = records.map(p => Number(p.pid ?? p.id)).filter(Number.isSafeInteger);
+        let statuses: Record<string, ProblemStatus> = {};
+        try { statuses = await client.problemStatus(scope, pids); } catch (error) { m.report(error, false); }
+        return records.map(p => {
+          const state = statuses[String(p.pid ?? p.id)], status = state?.status ?? -10, score = state?.score;
+          const tried = status !== -10;
+          const result = !tried || status === 0 ? undefined : score != null ? `${score} 分` : verdictCode(status);
+          const node = new Node(`${problemId(p)} · ${problemTitle(p)}`, 'hoj-connecter.openProblem', { displayId: problemId(p), scope }, 'circle-large-outline', [result, p.score == null ? '' : `满分 ${p.score}`].filter(Boolean).join(' · ') || undefined);
+          if (tried) { node.iconPath = verdictIcon(status); node.tooltip = `${verdict(status)}${score != null ? ` · ${score} 分` : ''}`; }
+          node.contextValue = 'hoj-connecter.problem'; return node;
+        });
+      };
       const filter = (records: ProblemSummary[]) => (scope.contestId || scope.groupId) && keyword ? records.filter(p => `${problemId(p)} ${problemTitle(p)}`.toLowerCase().includes(keyword.toLowerCase())) : records;
       const empty = new Node(scope.contestId ? '题单暂未公布或当前筛选无匹配项' : '没有匹配的题目', 'hoj-connecter.refresh', undefined, 'info', '点击刷新');
       if (scope.contestId) {
-        const nodes = problemNodes(filter((await client.problems(scope, 1, limit, keyword)).records));
+        const nodes = await problemNodes(filter((await client.problems(scope, 1, limit, keyword)).records));
         return [new Node('比赛信息与时间', 'hoj-connecter.contestInfo', undefined, 'clock'), new Node('排行榜', 'hoj-connecter.showRank', 'contest', 'graph'), ...(nodes.length ? nodes : [empty])];
       }
-      return this.paginate(async page => { const data = await client.problems(scope, page, limit, keyword); return { nodes: problemNodes(filter(data.records)), total: data.total, count: data.records.length }; }, empty);
+      return this.paginate(async page => { const data = await client.problems(scope, page, limit, keyword); return { nodes: await problemNodes(filter(data.records)), total: data.total, count: data.records.length }; }, empty);
     }
     if (this.name === 'groups') {
       this.message = store.account ? '我的团队' : '公开团队';
@@ -157,8 +174,8 @@ export class Explorer implements vscode.TreeDataProvider<Node>, vscode.Disposabl
         throw error;
       }
       const nodes = data.records.map(s => {
-        const node = new Node(`#${s.submitId} · ${verdict(s.status)}${!filter.onlyMine && s.username ? ` · ${s.username}` : ''}`, 'hoj-connecter.openSubmission', { id: s.submitId, scope, displayId: current?.displayId ?? s.displayId ?? s.displayPid }, s.status === 0 ? 'pass' : [5, 6, 7, 9].includes(s.status) ? 'sync~spin' : 'circle-outline', [scoreText(s), s.displayId ?? s.displayPid, s.language].filter(Boolean).join(' · '));
-        node.tooltip = `${s.title ?? ''}\n${s.time ?? '?'} ms / ${s.memory ?? '?'} KB`; return node;
+        const node = new Node(`#${s.submitId} · ${verdict(s.status)}${!filter.onlyMine && s.username ? ` · ${s.username}` : ''}`, 'hoj-connecter.openSubmission', { id: s.submitId, scope, displayId: current?.displayId ?? s.displayId ?? s.displayPid }, undefined, [scoreText(s), s.displayId ?? s.displayPid, s.language].filter(Boolean).join(' · '));
+        node.iconPath = verdictIcon(s.status); node.tooltip = `${s.title ?? ''}\n${s.time ?? '?'} ms / ${s.memory ?? '?'} KB`; return node;
       });
       return { nodes, total: data.total, count: data.records.length };
     }, new Node(filter.onlyMine && filter.status === undefined ? '暂无提交' : '没有符合筛选条件的提交', undefined, undefined, 'inbox'));

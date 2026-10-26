@@ -10,6 +10,8 @@ export interface Contest {
   description?: string; auth?: number; gid?: number; type?: number; status?: number;
 }
 export interface ProblemSummary { id?: number; pid?: number; problemId?: string; displayId?: string; title?: string; displayTitle?: string; difficulty?: number; score?: number }
+/** `/get-user-problem-status` entry: the latest verdict (AC wins outside contests); `score` only in contests. */
+export interface ProblemStatus { status: number; score?: number | null }
 export interface Sample { input: string; output: string }
 export interface Problem {
   id: number; problemId: string; title: string; description?: string; input?: string; output?: string;
@@ -81,6 +83,8 @@ export function asPage<T>(value: Page<T> | T[]): Page<T> {
 }
 const verdicts: Record<number, string> = { '-10': '未提交', '-5': '结果未知', '-4': '已取消', '-3': 'PE · 格式错误', '-2': 'CE · 编译错误', '-1': 'WA · 答案错误', 0: 'AC · 通过', 1: 'TLE · 超时', 2: 'MLE · 内存超限', 3: 'RE · 运行错误', 4: 'SE · 系统错误', 5: '排队中', 6: '编译中', 7: '评测中', 8: 'PAC · 部分通过', 9: '远程提交中', 10: '提交失败' };
 export function verdict(status: number): string { return verdicts[status] ?? `未知状态 (${status})`; }
+/** Short verdict code, e.g. "WA" or "排队中". */
+export function verdictCode(status: number): string { return verdict(status).split(' · ')[0]; }
 export function isPending(status: number): boolean { return [5, 6, 7, 9].includes(status); }
 export function scoreText(s: Submission): string { const score = s.score ?? s.oiRankScore; return score == null ? '' : `${score} 分`; }
 export function compareOutput(actual: string, expected: string, mode: string): boolean {
