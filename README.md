@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="media/hoj-connecter.svg" width="96" alt="HOJ-Connecter" />
+<img src="media/hoj-connecter.png" width="96" alt="HOJ-Connecter" />
 
 # HOJ-Connecter
 
