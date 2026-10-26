@@ -85,13 +85,31 @@ export class Files {
   async switch(problem: OpenProblem): Promise<void> {
     requireTrust(); const binding = this.store.binding(problem);
     const picked = await vscode.window.showQuickPick([
-      ...binding.files.map(file => ({ label: path.basename(vscode.Uri.parse(file).fsPath), description: vscode.Uri.parse(file).fsPath, file })),
-      { label: '$(folder-opened) 选择其他文件…', description: '', file: '' }
-    ], { title: `切换 ${problem.displayId} 的题目文件`, matchOnDescription: true });
+      ...binding.files.map(file => ({ label: `${file === binding.active ? '$(check) ' : ''}${path.basename(vscode.Uri.parse(file).fsPath)}`, description: vscode.Uri.parse(file).fsPath, file, unbind: false })),
+      { label: '$(folder-opened) 选择其他文件…', description: '', file: '', unbind: false },
+      ...(binding.active ? [{ label: '$(debug-disconnect) 取消关联当前文件', description: '文件本身会保留', file: '', unbind: true }] : [])
+    ], { title: `${binding.active ? '切换' : '关联'} ${problem.displayId} 的题目文件`, matchOnDescription: true });
     if (!picked) { return; }
+    if (picked.unbind) { await this.unbind(problem); return; }
     let uri: vscode.Uri | undefined = picked.file ? vscode.Uri.parse(picked.file) : undefined;
     if (!uri) { uri = (await vscode.window.showOpenDialog({ canSelectMany: false, openLabel: '关联为题目文件', canSelectFiles: true, canSelectFolders: false }))?.[0]; }
     if (uri) { if (uri.scheme !== 'file') { throw new Error('请选择本地代码文件。'); } await this.associate(problem, uri); await vscode.window.showTextDocument(uri, { preview: false }); this.changed(); }
+  }
+  /** Detaches the active file; it stays in the history so it can be relinked. */
+  async unbind(problem: OpenProblem): Promise<void> {
+    const binding = this.store.binding(problem);
+    if (!binding.active) { throw new Error(`${problem.displayId} 尚未关联题目文件。`); }
+    const name = path.basename(vscode.Uri.parse(binding.active).fsPath);
+    await this.store.updateBinding(problem, { active: undefined, files: [...binding.files.filter(file => file !== binding.active), binding.active] }); this.changed();
+    if (await vscode.window.showInformationMessage(`${problem.displayId} 已取消关联 ${name}，文件本身已保留。`, '重新关联') === '重新关联') { await this.relink(problem); }
+  }
+  /** Relinks the most recently used file, or lets the user pick one. */
+  async relink(problem: OpenProblem): Promise<void> {
+    requireTrust(); const binding = this.store.binding(problem), last = binding.files.at(-1);
+    if (!last || binding.files.length > 1) { await this.switch(problem); return; }
+    const uri = vscode.Uri.parse(last);
+    if (!await exists(uri)) { await this.store.updateBinding(problem, { files: [] }); throw new Error(`${path.basename(uri.fsPath)} 已不存在，请重新选择文件。`); }
+    await this.associate(problem, uri); await vscode.window.showTextDocument(uri, { preview: false }); this.changed();
   }
   private checkReplacement(problem: OpenProblem, doc?: vscode.TextDocument, version?: number): string {
     requireTrust();

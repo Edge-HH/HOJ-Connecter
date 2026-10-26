@@ -282,6 +282,19 @@
         "icon": "$(files)"
       },
       {
+        "command": "hoj-connecter.unbindSolution",
+        "title": "取消关联题目文件",
+        "category": "HOJ-Connecter",
+        "icon": "$(debug-disconnect)",
+        "enablement": "hoj-connecter.hasProblemFile"
+      },
+      {
+        "command": "hoj-connecter.relinkSolution",
+        "title": "重新关联题目文件",
+        "category": "HOJ-Connecter",
+        "icon": "$(link)"
+      },
+      {
         "command": "hoj-connecter.openSolution",
         "title": "打开题目文件",
         "category": "HOJ-Connecter",
@@ -527,6 +540,16 @@
           "group": "file@2"
         },
         {
+          "command": "hoj-connecter.unbindSolution",
+          "when": "viewItem == hoj-connecter.current && hoj-connecter.hasProblemFile",
+          "group": "file@3"
+        },
+        {
+          "command": "hoj-connecter.relinkSolution",
+          "when": "viewItem == hoj-connecter.current && !hoj-connecter.hasProblemFile",
+          "group": "file@3"
+        },
+        {
           "command": "hoj-connecter.openProblemAsFile",
           "when": "viewItem == hoj-connecter.current",
           "group": "file@3"
@@ -597,6 +620,11 @@
           "command": "hoj-connecter.resetToTemplate",
           "when": "hoj-connecter.isProblemFile && resourceScheme == file",
           "group": "code@2"
+        },
+        {
+          "command": "hoj-connecter.unbindSolution",
+          "when": "hoj-connecter.isProblemFile && resourceScheme == file",
+          "group": "code@3"
         },
         {
           "command": "hoj-connecter.submit",

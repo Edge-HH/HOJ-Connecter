@@ -206,8 +206,10 @@ export class Explorer implements vscode.TreeDataProvider<Node>, vscode.Disposabl
     files.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
     files.children = [new Node('新建题目文件', 'hoj-connecter.newSolution', undefined, 'new-file'), new Node('使用当前打开的文件', 'hoj-connecter.bindActiveFile', undefined, 'link'), new Node('切换 / 选择其他文件', 'hoj-connecter.switchSolution', undefined, 'folder-opened')];
     if (binding.active) { files.children.unshift(new Node(path.basename(vscode.Uri.parse(binding.active).fsPath), 'hoj-connecter.openSolution', undefined, 'file-code', '当前文件')); files.tooltip = vscode.Uri.parse(binding.active).fsPath; }
+    const last = binding.files.at(-1);
+    if (!binding.active && last) { files.children.unshift(new Node('重新关联', 'hoj-connecter.relinkSolution', undefined, 'link', binding.files.length > 1 ? `${binding.files.length} 个历史文件` : path.basename(vscode.Uri.parse(last).fsPath))); }
     if (binding.active) {
-      files.children.push(new Node('获取最后一次通过的代码', m.store.account ? 'hoj-connecter.fetchLastAcceptedCode' : undefined, undefined, 'cloud-download', m.store.account ? '覆盖当前代码' : '请先登录'), new Node('重置为模板', 'hoj-connecter.resetToTemplate', undefined, 'discard', '覆盖当前代码'));
+      files.children.push(new Node('取消关联当前文件', 'hoj-connecter.unbindSolution', undefined, 'debug-disconnect', '文件保留'), new Node('获取最后一次通过的代码', m.store.account ? 'hoj-connecter.fetchLastAcceptedCode' : undefined, undefined, 'cloud-download', m.store.account ? '覆盖当前代码' : '请先登录'), new Node('重置为模板', 'hoj-connecter.resetToTemplate', undefined, 'discard', '覆盖当前代码'));
     }
     const samples = new Node('样例', undefined, undefined, 'beaker', `${p.samples.length} 组`);
     samples.collapsibleState = vscode.TreeItemCollapsibleState.Collapsed;
