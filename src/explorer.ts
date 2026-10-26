@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { Contest, contestClock, Group, isPending, OpenProblem, ProblemStatus, ProblemSummary, problemId, problemTitle, Scope, SubmissionFilter, verdict, verdictCode, scoreText } from './domain';
+import { Contest, contestClock, Group, isPending, OpenProblem, ProblemStatus, ProblemSummary, problemId, problemTitle, Scope, Submission, SubmissionFilter, verdict, verdictCode, scoreText } from './domain';
 import { ApiError } from './api';
 import { Store } from './store';
 import { Files } from './files';
@@ -19,6 +19,10 @@ export function verdictIcon(status: number): vscode.ThemeIcon {
   const color = verdictColors[status];
   return color ? new vscode.ThemeIcon('error', new vscode.ThemeColor(color)) : new vscode.ThemeIcon('circle-outline');
 }
+function submissionNode(s: Submission, scope: Scope, displayId?: string, showUser = false): Node {
+  const node = new Node(`#${s.submitId} · ${verdict(s.status)}${showUser && s.username ? ` · ${s.username}` : ''}`, 'hoj-connecter.openSubmission', { id: s.submitId, scope, displayId: displayId ?? s.displayId ?? s.displayPid }, undefined, [scoreText(s), s.displayId ?? s.displayPid, s.language].filter(Boolean).join(' · '));
+  node.iconPath = verdictIcon(s.status); node.tooltip = `${s.title ?? ''}\n${s.time ?? '?'} ms / ${s.memory ?? '?'} KB${s.submitTime ? `\n${s.submitTime}` : ''}`; return node;
+}
 export class Node extends vscode.TreeItem {
   constructor(label: string, command?: string, readonly value?: unknown, icon?: string, description?: string) {
     super(label); this.description = description;
@@ -26,6 +30,8 @@ export class Node extends vscode.TreeItem {
     if (icon) { this.iconPath = new vscode.ThemeIcon(icon); }
   }
   children?: Node[];
+  /** Lazily fetched children, loaded each time the node expands. */
+  load?: () => Promise<Node[]>;
   section?: ViewName;
   list?: string;
 }
@@ -74,7 +80,7 @@ export class Explorer implements vscode.TreeDataProvider<Node>, vscode.Disposabl
   more(): void { if (this.hasNext) { this.page++; this.reload(); } }
   getTreeItem(node: Node): Node { return node; }
   async getChildren(node?: Node): Promise<Node[]> {
-    if (node) { return node.children ?? []; }
+    if (node) { return node.load ? node.load() : node.children ?? []; }
     if (!this.cache) {
       const generation = this.generation, before = this.status;
       this.cache = this.load().catch(error => {
@@ -173,11 +179,7 @@ export class Explorer implements vscode.TreeDataProvider<Node>, vscode.Disposabl
         if (!filter.onlyMine && error instanceof ApiError && error.status === 403) { throw new Error(scope.contestId ? '无权查看其他人的比赛提交（比赛可能已封榜或仅允许查看本人提交）。' : '站点不允许查看其他人的提交。'); }
         throw error;
       }
-      const nodes = data.records.map(s => {
-        const node = new Node(`#${s.submitId} · ${verdict(s.status)}${!filter.onlyMine && s.username ? ` · ${s.username}` : ''}`, 'hoj-connecter.openSubmission', { id: s.submitId, scope, displayId: current?.displayId ?? s.displayId ?? s.displayPid }, undefined, [scoreText(s), s.displayId ?? s.displayPid, s.language].filter(Boolean).join(' · '));
-        node.iconPath = verdictIcon(s.status); node.tooltip = `${s.title ?? ''}\n${s.time ?? '?'} ms / ${s.memory ?? '?'} KB`; return node;
-      });
-      return { nodes, total: data.total, count: data.records.length };
+      return { nodes: data.records.map(s => submissionNode(s, scope, current?.displayId, !filter.onlyMine)), total: data.total, count: data.records.length };
     }, new Node(filter.onlyMine && filter.status === undefined ? '暂无提交' : '没有符合筛选条件的提交', undefined, undefined, 'inbox'));
     return [filterNode, ...nodes];
   }
@@ -215,7 +217,26 @@ export class Explorer implements vscode.TreeDataProvider<Node>, vscode.Disposabl
     languageNode.tooltip = suggestion?.reason ?? '请关联代码文件，结合题目允许的语言自动推荐';
     return [new Node('查看题面', 'hoj-connecter.showProblem', undefined, 'book'), files, languageNode,
       new Node(m.store.account ? '提交评测' : '登录后提交', m.store.account ? 'hoj-connecter.submit' : 'hoj-connecter.login', undefined, 'cloud-upload'), samples,
-      new Node('本题全部提交', 'hoj-connecter.problemSubmissions', undefined, 'history', '所有人的评测记录')];
+      this.historyNode(p)];
+  }
+  /** The account's recent submissions to the open problem, fetched whenever it expands. */
+  private historyNode(p: OpenProblem): Node {
+    const store = this.model.store, account = store.account;
+    const node = new Node('本题提交记录', undefined, undefined, 'history', account ? '我的最近提交' : '登录后查看我的提交');
+    node.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+    const everyone = new Node('查看所有人的提交', 'hoj-connecter.problemSubmissions', undefined, 'organization');
+    node.load = async () => {
+      if (!account) { return [new Node('登录后查看', 'hoj-connecter.login', undefined, 'sign-in'), everyone]; }
+      try {
+        const data = await store.client(p.scope).submissions(p.scope, p.displayId, 1, 10, { onlyMine: true });
+        const nodes = data.records.map(s => submissionNode(s, p.scope, p.displayId));
+        return [...(nodes.length ? nodes : [new Node('暂无提交', undefined, undefined, 'inbox')]), ...(data.total > nodes.length ? [new Node('查看我的全部提交', 'hoj-connecter.mySubmissions', undefined, 'history', `共 ${data.total} 次`)] : []), everyone];
+      } catch (error) {
+        this.model.report(error, false);
+        return [new Node(error instanceof Error ? error.message : String(error), 'hoj-connecter.refresh', undefined, 'warning', '点击重试'), everyone];
+      }
+    };
+    return node;
   }
   dispose(): void { this.changed.dispose(); this.loaded.dispose(); }
 }
@@ -314,7 +335,7 @@ export class Navigation implements vscode.TreeDataProvider<Node>, vscode.Disposa
       ];
       return [session, groups, ...(m.current ? [current] : []), ...(m.contest ? [problems] : []), this.list('problems', scope, '公共题单'), this.list('contests', scope, '公共比赛'), ...teamLists, this.roots.get('submissions')!, ...actions];
     }
-    const children = node.list ? await this.getList(node.list)?.getChildren() ?? [] : node.section ? await this.sections[node.section].getChildren() : node.children ?? [];
+    const children = node.list ? await this.getList(node.list)?.getChildren() ?? [] : node.section ? await this.sections[node.section].getChildren() : node.load ? await node.load() : node.children ?? [];
     children.forEach((child, index) => { this.parents.set(child, node!); child.id ??= `${node!.id}/${index}/${typeof child.label === 'string' ? child.label : ''}`; });
     return children;
   }

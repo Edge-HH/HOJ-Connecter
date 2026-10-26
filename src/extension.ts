@@ -106,7 +106,7 @@ export class App implements vscode.Disposable, ViewModel {
       nextPage: arg => { const view = this.navigation.explorerFor(pager(arg)); view?.go(view.page + 1); },
       jumpPage: arg => this.jumpPage(this.navigation.explorerFor(pager(arg))),
       showRank: arg => this.showRank(value<RankKind>(arg)), rankPrevious: () => this.rankPage(-1), rankNext: () => this.rankPage(1), rankSearch: () => this.rankSearch(), rankMe: () => this.rankSearch(true), rankRefresh: () => this.loadRank(false, true),
-      filterSubmissions: () => this.filterSubmissions(), problemSubmissions: () => this.setSubmissionFilter({ onlyMine: false })
+      filterSubmissions: () => this.filterSubmissions(), problemSubmissions: () => this.setSubmissionFilter({ onlyMine: false }), mySubmissions: () => this.setSubmissionFilter({ onlyMine: true })
     };
     for (const [name, handler] of Object.entries(commands)) {
       this.subscriptions.push(vscode.commands.registerCommand(`hoj-connecter.${name}`, async (...args: unknown[]) => { try { return await handler(...args); } catch (error) { this.report(error); } }));
@@ -431,7 +431,7 @@ export class App implements vscode.Disposable, ViewModel {
       if (!submission?.submitId) { throw new Error('站点没有返回提交编号，请先检查“我的提交”，避免重复提交。'); }
       this.output.appendLine(`提交 #${submission.submitId} · ${client.site.name} / ${client.account?.username} / ${problem.displayId} / ${path.basename(doc.uri.fsPath)}`);
       await this.docs.show(`submission-${client.site.id}-${submission.submitId}`, `提交 ${submission.submitId}`, `# ${problem.displayId} · 提交 #${submission.submitId}\n\n正在等待评测…\n\n文件：${path.basename(doc.uri.fsPath)} · ${language}`, 'result');
-      this.views.submissions.refresh(true); await this.poll(client, submission.submitId, { problem, site: client.site, solutionUri: doc.uri.toString(), code });
+      this.views.submissions.refresh(true); this.views.current.refresh(); await this.poll(client, submission.submitId, { problem, site: client.site, solutionUri: doc.uri.toString(), code });
     } finally { this.submitting.delete(key); }
   }
   private async poll(client: HojClient, id: number, source: DetailAttachment & { problem: OpenProblem }): Promise<void> {
@@ -444,7 +444,7 @@ export class App implements vscode.Disposable, ViewModel {
           const config = vscode.workspace.getConfiguration('hoj-connecter'); const end = Date.now() + config.get('pollTimeoutSeconds', 180) * 1000;
           while (!controller.signal.aborted && Date.now() < end) {
             const result = await client.submission(id); if (controller.signal.aborted) { return; }
-            progress.report({ message: `${verdict(result.status)} ${scoreText(result)}` }); this.views.submissions.refresh();
+            progress.report({ message: `${verdict(result.status)} ${scoreText(result)}` }); this.views.submissions.refresh(); this.views.current.refresh();
             if (sameScope(scope, this.store.scope) && this.current?.displayId === displayId) {
               await this.docs.show(`submission-${client.site.id}-${id}`, `提交 ${id}`, submissionMarkdown(result), 'result', false, result.status !== 0 && !isPending(result.status) ? { ...source, submission: result } : undefined);
             }
