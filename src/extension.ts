@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { Account, Contest, contestClock, Group, isPending, normalizeSiteUrl, OpenProblem, parseSamples, problemId, problemKey, ProblemStatus, problemTitle, verdictCode, RankKind, sameScope, Scope, scoreText, Site, SubmissionFilter, validateApiPath, verdict } from './domain';
 import { ApiError, HojClient, passwordKey, tokenKey } from './api';
 import { contestRankMarkdown, rankListMarkdown, unpinSelf } from './ranks';
-import { DetailAttachment, Documents, contestMarkdown, fence, problemMarkdown, submissionMarkdown } from './documents';
+import { DetailAttachment, Documents, readerLocation, contestMarkdown, fence, problemMarkdown, submissionMarkdown } from './documents';
 import { AssistantId, attachToAssistant, installedAssistants } from './assistants';
 import { Explorer, Navigation, Node, ViewModel, ViewName } from './explorer';
 import { Cancelled, Files, requireTrust } from './files';
@@ -41,7 +41,10 @@ export class App implements vscode.Disposable, ViewModel {
     this.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('hoj-connecter', this.docs), vscode.window.registerWebviewViewProvider('hoj-connecter.details', this.docs, { webviewOptions: { retainContextWhenHidden: true } }));
     this.registerCommands(); this.status.command = 'hoj-connecter.showNavigation'; this.updateStatus(); this.status.show();
     this.timer = setInterval(() => { this.updateStatus(); if (this.contest) { this.navigation.tick(); } if (++this.ticks % 30 === 0) { this.autoRefreshRank(); } }, 1000);
-    this.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => { if (e.affectsConfiguration('hoj-connecter')) { this.refresh(); } }));
+    this.subscriptions.push(vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration('hoj-connecter.readerLocation')) { void this.docs.relocate().catch(error => this.report(error)); return; }
+      if (e.affectsConfiguration('hoj-connecter')) { this.refresh(); }
+    }));
     this.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => this.refreshLocal()));
     this.subscriptions.push(vscode.workspace.onDidSaveTextDocument(() => this.refreshLocal()));
     this.subscriptions.push(vscode.extensions.onDidChange(() => this.docs.refresh(true)));
@@ -92,7 +95,7 @@ export class App implements vscode.Disposable, ViewModel {
       addSite: () => this.addSite(), editSite: arg => this.editSite(value<Site>(arg)), removeSite: arg => this.removeSite(value<Site>(arg)), switchSite: arg => this.switchSite(value<Site>(arg)),
       login: arg => this.login(value<Site>(arg)), relogin: arg => this.relogin(value<{ site: Site; account?: Account }>(arg)?.account), importToken: () => this.importToken(), switchAccount: arg => this.switchAccount(value<{ site: Site; account?: Account }>(arg)), removeAccount: arg => this.removeAccount(value<{ account: Account }>(arg)?.account),
       refresh: () => this.refresh(), searchProblems: arg => this.search(arg instanceof Node ? arg : undefined), openProblemById: () => this.openById(), openProblem: arg => { const p = value<{ displayId: string; scope: Scope }>(arg); return p && this.openProblem(p.displayId, p.scope); },
-      showNavigation: () => this.navigation.reveal('problems'), showProblem: () => this.showProblem(), restoreSidebar: () => this.docs.restore(), openDetailAsFile: () => this.docs.openAsFile(), openProblemAsFile: () => this.docs.openAsFile('problem'), openResultAsFile: () => this.docs.openAsFile('result'), showTests: () => vscode.commands.executeCommand('workbench.view.testing.focus'),
+      showNavigation: () => this.navigation.reveal('problems'), showProblem: () => this.showProblem(), restoreSidebar: () => this.docs.restore(), toggleReaderLocation: () => vscode.workspace.getConfiguration('hoj-connecter').update('readerLocation', readerLocation() === 'sidebar' ? 'secondarySidebar' : 'sidebar', vscode.ConfigurationTarget.Global), openDetailAsFile: () => this.docs.openAsFile(), openProblemAsFile: () => this.docs.openAsFile('problem'), openResultAsFile: () => this.docs.openAsFile('result'), showTests: () => vscode.commands.executeCommand('workbench.view.testing.focus'),
       attachToCodex: () => this.attach('codex'), attachToClaude: () => this.attach('claude'), attachToCopilot: () => this.attach('copilot'),
       enterGroup: arg => arg ? this.enterGroup(value<{ id: number; scope: Scope }>(arg)) : this.pickGroups(), addGroup: () => this.enterGroup(), enterContest: arg => this.enterContest(value<{ id: number; scope: Scope }>(arg)), registerContest: () => this.registerContest(),
       leaveContext: () => this.leaveContext(), leaveContest: () => this.leaveContest(), contestInfo: () => this.showContest(), contestRank: () => this.showRank('contest'),

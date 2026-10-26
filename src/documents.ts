@@ -7,6 +7,10 @@ import type { Assistant } from './assistants';
 
 const turndown = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
 const readerContainer = 'workbench.view.extension.hoj-connecter-reader';
+const navigatorContainer = 'workbench.view.extension.hoj-connecter';
+/** `sidebar` shows the reader under the OJ navigation; otherwise it lives in the right Secondary Side Bar. */
+export type ReaderLocation = 'secondarySidebar' | 'sidebar';
+export const readerLocation = (): ReaderLocation => vscode.workspace.getConfiguration('hoj-connecter').get<ReaderLocation>('readerLocation', 'secondarySidebar');
 const readerLayoutVersion = 'hoj-connecter.reader.secondarySidebar.v1';
 turndown.remove(['script', 'style', 'iframe', 'form', 'object']);
 export function prose(value: string | undefined, site: Site): string {
@@ -86,6 +90,8 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
   private renderSignature?: string;
   private disposed = false;
   private placement?: Promise<void>;
+  /** Whether this session already moved the view to the configured location. */
+  private placed = false;
   get sidebarState() { return { resolved: !!this.view, visible: this.view?.visible ?? false, rendered: this.rendered }; }
   private readonly entries = new Map<DetailKind, Detail>();
   private readonly subscriptions: vscode.Disposable[] = [];
@@ -148,10 +154,11 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
   async reveal(): Promise<void> {
     // Existing installations may still store this view under the old OJ navigator.
     // Migrate once; later user layout customizations remain available until Restore.
-    if (!this.context.globalState.get<boolean>(readerLayoutVersion)) {
-      await (this.placement ??= this.resetPlacement().then(() => this.context.globalState.update(readerLayoutVersion, true)).finally(() => { this.placement = undefined; }));
+    const inSidebar = readerLocation() === 'sidebar';
+    if (inSidebar ? !this.placed : !this.context.globalState.get<boolean>(readerLayoutVersion)) {
+      await (this.placement ??= this.place().then(() => this.context.globalState.update(readerLayoutVersion, true)).finally(() => { this.placement = undefined; }));
     }
-    await vscode.commands.executeCommand(readerContainer);
+    await vscode.commands.executeCommand(inSidebar ? navigatorContainer : readerContainer);
     await vscode.commands.executeCommand('hoj-connecter.details.focus', { preserveFocus: true });
     await this.waitForSidebar(() => !!this.view, '题面侧栏未能创建，请执行“HOJ-Connecter: 恢复题面侧栏”后重试。');
     this.view!.show(true);
@@ -161,8 +168,20 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
     await vscode.commands.executeCommand(`${readerContainer}.resetViewContainerLocation`);
     await vscode.commands.executeCommand('hoj-connecter.details.resetViewLocation');
   }
+  /** Moves the view to the configured location. */
+  private async place(): Promise<void> {
+    if (readerLocation() === 'sidebar') { await vscode.commands.executeCommand('vscode.moveViews', { viewIds: ['hoj-connecter.details'], destinationId: navigatorContainer }); }
+    else { await this.resetPlacement(); }
+    this.placed = true;
+  }
+  /** Applies a changed `readerLocation` and shows the reader there. */
+  async relocate(): Promise<void> {
+    this.placed = false; await this.place();
+    this.renderSignature = undefined; this.render();
+    if (this.active) { await this.reveal(); }
+  }
   async restore(): Promise<void> {
-    await this.resetPlacement();
+    await this.place();
     this.renderSignature = undefined; this.render(); await this.reveal();
   }
   clear(): void { this.active = undefined; this.entries.clear(); this.render(); void vscode.commands.executeCommand('setContext', 'hoj-connecter.hasDetail', false); }

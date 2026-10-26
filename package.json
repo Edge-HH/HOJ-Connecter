@@ -410,9 +410,15 @@
       },
       {
         "command": "hoj-connecter.restoreSidebar",
-        "title": "恢复题面侧栏（右侧）",
+        "title": "恢复题面视图位置",
         "category": "HOJ-Connecter",
         "icon": "$(layout-sidebar-right)"
+      },
+      {
+        "command": "hoj-connecter.toggleReaderLocation",
+        "title": "切换题面显示位置（左侧导航下方 / 右侧栏）",
+        "category": "HOJ-Connecter",
+        "icon": "$(arrow-swap)"
       }
     ],
     "menus": {
@@ -491,6 +497,11 @@
           "command": "hoj-connecter.restoreSidebar",
           "when": "view == hoj-connecter.navigation || view == hoj-connecter.details",
           "group": "layout@1"
+        },
+        {
+          "command": "hoj-connecter.toggleReaderLocation",
+          "when": "view == hoj-connecter.navigation || view == hoj-connecter.details",
+          "group": "layout@2"
         }
       ],
       "view/item/context": [
@@ -655,6 +666,13 @@
     "configuration": {
       "title": "HOJ-Connecter",
       "properties": {
+        "hoj-connecter.readerLocation": {
+          "type": "string",
+          "enum": ["secondarySidebar", "sidebar"],
+          "enumDescriptions": ["显示在右侧辅助侧栏", "显示在左侧 HOJ-Connecter 侧栏、OJ 导航下方"],
+          "default": "secondarySidebar",
+          "description": "“题面与结果”视图的位置。"
+        },
         "hoj-connecter.solutionDirectory": {
           "type": "string",
           "scope": "resource",
