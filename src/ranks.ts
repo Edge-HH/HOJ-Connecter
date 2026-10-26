@@ -11,11 +11,26 @@ function rankHeader(title: string, view: RankView, total: number, note = ''): st
   const pages = Math.max(1, Math.ceil(total / view.limit));
   return [`# ${title}`, [`第 ${view.page}/${pages} 页 · 共 ${total} 人`, view.keyword ? `搜索：${cell(view.keyword)}` : '', note].filter(Boolean).join(' · ')];
 }
+/**
+ * HOJ pins the signed-in user's row above page 1 of a contest scoreboard and
+ * counts it in `total`, so the user appears twice. Splits that pinned row off.
+ */
+export function unpinSelf(data: Page<ContestRankRow>, page: number, me?: string): { data: Page<ContestRankRow>; self?: ContestRankRow } {
+  const [first, ...rest] = data.records;
+  if (page !== 1 || !me || first?.username !== me) { return { data }; }
+  const next = rest[0]?.rank, rank = first.rank;
+  const pinned = rest.some(row => row.username === me) || (rank != null && next != null && rank > 0 && next > 0 && rank > next);
+  return pinned ? { data: { records: rest, total: Math.max(0, data.total - 1) }, self: first } : { data };
+}
 /** Contest scoreboard; `problems` are display IDs in contest order. */
-export function contestRankMarkdown(contest: Contest, problems: readonly string[], data: Page<ContestRankRow>, view: RankView): string {
+export function contestRankMarkdown(contest: Contest, problems: readonly string[], data: Page<ContestRankRow>, view: RankView, self?: ContestRankRow): string {
   const oi = contest.type === 1, now = Date.now();
   const running = Date.parse(contest.startTime) <= now && now < Date.parse(contest.endTime);
   const head = rankHeader(`${contest.title} · ${oi ? 'OI' : 'ACM'} 排行榜`, view, data.total, running ? '比赛进行中，每 30 秒自动刷新' : '');
+  if (self) {
+    const rank = self.rank == null || self.rank < 0 ? '打星' : `第 ${self.rank} 名`;
+    head.push(`**我的排名：${rank}** · ${oi ? `总分 ${self.totalScore ?? 0}` : `通过 ${self.ac ?? 0} · 罚时 ${self.totalTime == null ? '-' : durationText(self.totalTime * 1000)}`}（点击“定位到我”跳转到所在页）`);
+  }
   if (!data.records.length) { return [...head, '暂无排名数据。'].join('\n\n'); }
   const columns = oi ? ['排名', '用户', '总分', ...problems] : ['排名', '用户', '通过', '罚时', ...problems];
   const rows = data.records.map((row, index) => {

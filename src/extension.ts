@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { Account, Contest, contestClock, Group, isPending, normalizeSiteUrl, OpenProblem, parseSamples, problemId, problemKey, ProblemStatus, problemTitle, verdictCode, RankKind, sameScope, Scope, scoreText, Site, SubmissionFilter, validateApiPath, verdict } from './domain';
 import { ApiError, HojClient, passwordKey, tokenKey } from './api';
-import { contestRankMarkdown, rankListMarkdown } from './ranks';
+import { contestRankMarkdown, rankListMarkdown, unpinSelf } from './ranks';
 import { DetailAttachment, Documents, contestMarkdown, fence, problemMarkdown, submissionMarkdown } from './documents';
 import { AssistantId, attachToAssistant, installedAssistants } from './assistants';
 import { Explorer, Navigation, Node, ViewModel, ViewName } from './explorer';
@@ -106,7 +106,7 @@ export class App implements vscode.Disposable, ViewModel {
       previousPage: arg => { const view = this.navigation.explorerFor(pager(arg)); view?.go(view.start - 1); },
       nextPage: arg => { const view = this.navigation.explorerFor(pager(arg)); view?.go(view.page + 1); },
       jumpPage: arg => this.jumpPage(this.navigation.explorerFor(pager(arg))),
-      showRank: arg => this.showRank(value<RankKind>(arg)), rankPrevious: () => this.rankPage(-1), rankNext: () => this.rankPage(1), rankSearch: () => this.rankSearch(), rankMe: () => this.rankSearch(true), rankRefresh: () => this.loadRank(false, true),
+      showRank: arg => this.showRank(value<RankKind>(arg)), rankPrevious: () => this.rankPage(-1), rankNext: () => this.rankPage(1), rankSearch: () => this.rankSearch(), rankMe: () => this.rankSearch(true), rankClear: () => { if (this.rank) { this.rank.keyword = undefined; this.rank.page = 1; return this.loadRank(); } }, rankRefresh: () => this.loadRank(false, true),
       filterSubmissions: () => this.filterSubmissions(), problemSubmissions: () => this.setSubmissionFilter({ onlyMine: false }), mySubmissions: () => this.setSubmissionFilter({ onlyMine: true })
     };
     for (const [name, handler] of Object.entries(commands)) {
@@ -247,13 +247,14 @@ export class App implements vscode.Disposable, ViewModel {
     const client = this.store.client(), view = { ...rank, me: this.store.account?.username };
     if (rank.kind === 'contest') {
       const contest = this.contest; if (!contest || contest.id !== rank.contestId) { throw new Error('比赛已切换，请重新打开排行榜。'); }
-      const [data, problems] = await Promise.all([client.contestRank(contest.id, rank.page, rank.limit, { keyword: rank.keyword, forceRefresh }), client.problems({ ...this.store.scope }, 1, 0)]);
+      const [raw, problems] = await Promise.all([client.contestRank(contest.id, rank.page, rank.limit, { keyword: rank.keyword, forceRefresh }), client.problems({ ...this.store.scope }, 1, 0)]);
+      const { data, self } = unpinSelf(raw, rank.page, view.me);
       rank.total = data.total;
-      await this.docs.show(`rank-${this.store.site.id}-contest-${contest.id}`, `${contest.title} 排行榜`, contestRankMarkdown(contest, problems.records.map(problemId), data, view), 'rank', reveal);
+      await this.docs.show(`rank-${this.store.site.id}-contest-${contest.id}`, `${contest.title} 排行榜`, contestRankMarkdown(contest, problems.records.map(problemId), data, view, self), 'rank', reveal, undefined, this.rankExtras());
     } else {
       const data = await client.rankList(rank.kind, rank.page, rank.limit, rank.keyword);
       rank.total = data.total;
-      await this.docs.show(`rank-${this.store.site.id}-${rank.kind}`, `${rank.kind === 'oi' ? 'OI' : 'ACM'} 排行榜`, rankListMarkdown(this.store.site, data, view), 'rank', reveal);
+      await this.docs.show(`rank-${this.store.site.id}-${rank.kind}`, `${rank.kind === 'oi' ? 'OI' : 'ACM'} 排行榜`, rankListMarkdown(this.store.site, data, view), 'rank', reveal, undefined, this.rankExtras());
     }
   }
   private async rankPage(delta: number): Promise<void> {
@@ -261,12 +262,33 @@ export class App implements vscode.Disposable, ViewModel {
     const pages = Math.max(1, Math.ceil((rank.total ?? 0) / rank.limit)), page = Math.min(pages, Math.max(1, rank.page + delta));
     if (page !== rank.page) { rank.page = page; await this.loadRank(); }
   }
+  private rankExtras() { return this.rank?.keyword ? { buttons: [{ action: 'hoj-connecter.rankClear', label: '显示全部', title: '清除搜索，回到完整排行榜' }] } : undefined; }
   private async rankSearch(me = false): Promise<void> {
     const rank = this.rank; if (!rank) { return; }
-    if (me && !this.store.account) { throw new Error('请先登录，再定位到自己的排名。'); }
-    const keyword = me ? this.store.account!.username : await vscode.window.showInputBox({ title: '在排行榜中搜索用户', value: rank.keyword, prompt: '输入用户名，留空显示全部' });
+    if (me) { await this.locateMe(); return; }
+    const keyword = await vscode.window.showInputBox({ title: '在排行榜中搜索用户', value: rank.keyword, prompt: '输入用户名，留空显示全部' });
     if (keyword === undefined) { return; }
     rank.keyword = keyword.trim() || undefined; rank.page = 1; await this.loadRank();
+  }
+  /** Jumps to the full scoreboard page holding the account's row; falls back to a name search. */
+  private async locateMe(): Promise<void> {
+    const rank = this.rank, me = this.store.account?.username; if (!rank) { return; }
+    if (!me) { throw new Error('请先登录，再定位到自己的排名。'); }
+    const contest = this.contest;
+    if (rank.kind === 'contest' && contest && contest.id === rank.contestId) {
+      const client = this.store.client(), mine = (rows: { username?: string }[]) => rows.some(row => row.username === me);
+      const first = unpinSelf(await client.contestRank(contest.id, 1, rank.limit), 1, me);
+      const pages = Math.max(1, Math.ceil(first.data.total / rank.limit));
+      let found = mine(first.data.records) ? 1 : undefined;
+      // Page 1 lacks the pinned row, so real index i sits on page floor((i + 1) / limit) + 1; ties only push it later.
+      const selfRank = first.self?.rank ?? 0, start = selfRank > 0 ? Math.floor(selfRank / rank.limit) + 1 : 2;
+      for (let page = Math.max(2, start); !found && page <= Math.min(pages, start + 3); page++) {
+        if (mine((await client.contestRank(contest.id, page, rank.limit)).records)) { found = page; }
+      }
+      if (found) { rank.keyword = undefined; rank.page = found; await this.loadRank(); return; }
+    }
+    rank.keyword = me; rank.page = 1; await this.loadRank();
+    vscode.window.showInformationMessage('已按用户名筛选排行榜，点击“显示全部”返回完整榜单。');
   }
   private async jumpPage(view?: Explorer): Promise<void> {
     if (!view?.paged) { return; }
