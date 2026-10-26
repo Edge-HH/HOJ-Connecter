@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { Account, Contest, contestClock, Group, isPending, normalizeSiteUrl, OpenProblem, parseSamples, problemId, problemKey, RankKind, sameScope, Scope, scoreText, Site, SubmissionFilter, validateApiPath, verdict } from './domain';
+import { Account, Contest, contestClock, Group, isPending, normalizeSiteUrl, OpenProblem, parseSamples, problemId, problemKey, ProblemStatus, problemTitle, verdictCode, RankKind, sameScope, Scope, scoreText, Site, SubmissionFilter, validateApiPath, verdict } from './domain';
 import { ApiError, HojClient, passwordKey, tokenKey } from './api';
 import { contestRankMarkdown, rankListMarkdown } from './ranks';
 import { DetailAttachment, Documents, contestMarkdown, fence, problemMarkdown, submissionMarkdown } from './documents';
@@ -37,7 +37,7 @@ export class App implements vscode.Disposable, ViewModel {
     this.samples = new Samples(context, this.store, this.files, () => this.refreshLocal());
     this.views = Object.fromEntries((['session', 'problems', 'groups', 'contests', 'current', 'submissions'] as ViewName[]).map(name => [name, new Explorer(name, this)])) as Record<ViewName, Explorer>;
     this.navigation = new Navigation(this, this.views);
-    this.docs = new Documents(context, async command => vscode.commands.executeCommand(command), error => this.report(error), () => ({ hasFile: !!this.current && !!this.store.binding(this.current).active, loggedIn: !!this.store.account, assistants: installedAssistants() }));
+    this.docs = new Documents(context, async (command, ...args) => vscode.commands.executeCommand(command, ...args), error => this.report(error), () => ({ hasFile: !!this.current && !!this.store.binding(this.current).active, loggedIn: !!this.store.account, assistants: installedAssistants() }));
     this.subscriptions.push(vscode.workspace.registerTextDocumentContentProvider('hoj-connecter', this.docs), vscode.window.registerWebviewViewProvider('hoj-connecter.details', this.docs, { webviewOptions: { retainContextWhenHidden: true } }));
     this.registerCommands(); this.status.command = 'hoj-connecter.showNavigation'; this.updateStatus(); this.status.show();
     this.timer = setInterval(() => { this.updateStatus(); if (this.contest) { this.navigation.tick(); } if (++this.ticks % 30 === 0) { this.autoRefreshRank(); } }, 1000);
@@ -95,7 +95,8 @@ export class App implements vscode.Disposable, ViewModel {
       showNavigation: () => this.navigation.reveal('problems'), showProblem: () => this.showProblem(), restoreSidebar: () => this.docs.restore(), openDetailAsFile: () => this.docs.openAsFile(), openProblemAsFile: () => this.docs.openAsFile('problem'), openResultAsFile: () => this.docs.openAsFile('result'), showTests: () => vscode.commands.executeCommand('workbench.view.testing.focus'),
       attachToCodex: () => this.attach('codex'), attachToClaude: () => this.attach('claude'), attachToCopilot: () => this.attach('copilot'),
       enterGroup: arg => arg ? this.enterGroup(value<{ id: number; scope: Scope }>(arg)) : this.pickGroups(), addGroup: () => this.enterGroup(), enterContest: arg => this.enterContest(value<{ id: number; scope: Scope }>(arg)), registerContest: () => this.registerContest(),
-      leaveContext: () => this.leaveContext(), leaveContest: () => this.leaveContest(), contestInfo: () => this.showContest(),
+      leaveContext: () => this.leaveContext(), leaveContest: () => this.leaveContest(), contestInfo: () => this.showContest(), contestRank: () => this.showRank('contest'),
+      openContestProblem: arg => { if (!this.contest || typeof arg !== 'string') { throw new Error('请先进入一场比赛。'); } return this.openProblem(arg, { ...this.store.scope }); },
       newSolution: () => this.files.create(this.problem()), bindActiveFile: () => this.files.bindActive(this.problem()), switchSolution: () => this.files.switch(this.problem()), openSolution: () => this.files.open(this.problem()), selectLanguage: () => this.files.language(this.problem(), true),
       fetchLastAcceptedCode: () => this.files.fetchLastAcceptedCode(this.problem()), resetToTemplate: () => this.files.resetToTemplate(this.problem()),
       submit: () => this.submit(), openSubmission: arg => this.openSubmission(value<{ id: number; scope: Scope; displayId?: string }>(arg)), importSamples: () => this.samples.import(this.problem()), testSamples: () => this.testSamples(), openInBrowser: () => this.openBrowser(),
@@ -414,7 +415,28 @@ export class App implements vscode.Disposable, ViewModel {
     const password = await vscode.window.showInputBox({ title: `${contest.title} · 比赛密码`, password: true, ignoreFocusOut: true });
     if (password !== undefined) { await client.registerContest(contest.id, password); this.refresh(); }
   }
-  private async showContest(): Promise<void> { if (!this.contest) { throw new Error('请先进入一场比赛。'); } await this.docs.show(`contest-${this.store.site.id}-${this.contest.id}`, this.contest.title, contestMarkdown(this.contest, this.store.site), 'contest'); }
+  /** Contest page with the scoreboard button and the clickable problem list (with the account's verdicts). */
+  private async showContest(reveal = true): Promise<void> {
+    const contest = this.contest; if (!contest) { throw new Error('请先进入一场比赛。'); }
+    const scope = { ...this.store.scope }, client = this.store.client(scope);
+    let items: { arg: string; label: string; description?: string; state?: 'ac' | 'failed' | 'pending' }[] = [], itemsTitle = '比赛题单';
+    try {
+      const problems = (await client.problems(scope, 1, 0)).records;
+      let statuses: Record<string, ProblemStatus> = {};
+      try { statuses = await client.problemStatus(scope, problems.map(p => Number(p.pid ?? p.id)).filter(Number.isSafeInteger)); } catch (error) { this.report(error, false); }
+      items = problems.map((p): typeof items[number] => {
+        const state = statuses[String(p.pid ?? p.id)], status = state?.status ?? -10, tried = status !== -10;
+        const result = !tried ? '' : status === 0 ? `✓ ${state?.score != null ? `${state.score} 分` : 'AC'}` : state?.score != null ? `${state.score} 分 · ${verdictCode(status)}` : verdictCode(status);
+        return { arg: problemId(p), label: `${problemId(p)} · ${problemTitle(p)}`, description: [result, p.score == null ? '' : `满分 ${p.score}`].filter(Boolean).join(' · ') || undefined, state: !tried ? undefined : status === 0 ? 'ac' : isPending(status) ? 'pending' : 'failed' };
+      });
+      if (!items.length) { itemsTitle = '比赛题单（暂未公布）'; }
+    } catch (error) { this.report(error, false); itemsTitle = `比赛题单（${error instanceof Error ? error.message : String(error)}）`; }
+    if (this.contest !== contest) { return; }
+    await this.docs.show(`contest-${this.store.site.id}-${contest.id}`, contest.title, contestMarkdown(contest, this.store.site), 'contest', reveal, undefined, {
+      items, itemsTitle, itemAction: 'hoj-connecter.openContestProblem',
+      buttons: [{ action: 'hoj-connecter.contestRank', label: '排行榜', title: '查看本场比赛排行榜' }, { action: 'hoj-connecter.contestInfo', label: '刷新题单' }, { action: 'hoj-connecter.openInBrowser', label: '在浏览器打开' }]
+    });
+  }
   private async leaveContext(): Promise<void> { this.store.scope = { siteId: this.store.scope.siteId, accountId: this.store.scope.accountId }; await this.store.save(); await this.reset(); }
   private async leaveContest(): Promise<void> {
     const group = this.group; await this.reset(); this.group = group; this.store.scope = { ...this.store.scope, groupId: group?.id }; await this.store.save(); this.refresh();
@@ -452,6 +474,7 @@ export class App implements vscode.Disposable, ViewModel {
               this.output.appendLine(`#${id} · ${verdict(result.status)} ${scoreText(result)} · ${result.time ?? '?'} ms`);
               // Problem rows show the account's latest verdict.
               this.views.problems.refresh(); this.navigation.refreshLists();
+              if (this.contest && scope.contestId === this.contest.id) { void this.showContest(false).catch(error => this.report(error, false)); }
               void vscode.window.showInformationMessage(`${displayId} · #${id} · ${verdict(result.status)} ${scoreText(result)}`); return;
             }
             await new Promise<void>(resolve => {

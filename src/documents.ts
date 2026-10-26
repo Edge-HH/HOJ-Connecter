@@ -68,7 +68,13 @@ function submissionCasesMarkdown(s: Submission): string {
 }
 export type DetailKind = 'problem' | 'result' | 'contest' | 'rank';
 export interface DetailAttachment { site: Site; problem?: OpenProblem; submission?: Submission; solutionUri?: string; code?: string }
-interface Detail { id: string; title: string; content: string; kind: DetailKind; attachment?: DetailAttachment }
+/** Extra footer buttons and a clickable list (e.g. contest problems) owned by one entry. */
+export interface DetailExtras {
+  buttons?: { action: string; label: string; title?: string }[];
+  items?: { arg: string; label: string; description?: string; state?: 'ac' | 'failed' | 'pending' }[];
+  itemsTitle?: string; itemAction?: string;
+}
+interface Detail { id: string; title: string; content: string; kind: DetailKind; attachment?: DetailAttachment; extras?: DetailExtras }
 export class Documents implements vscode.TextDocumentContentProvider, vscode.WebviewViewProvider, vscode.Disposable {
   private readonly contents = new Map<string, string>();
   private readonly changed = new vscode.EventEmitter<vscode.Uri>();
@@ -84,7 +90,7 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
   private readonly entries = new Map<DetailKind, Detail>();
   private readonly subscriptions: vscode.Disposable[] = [];
   active?: Detail;
-  constructor(private readonly context: vscode.ExtensionContext, private readonly action: (command: string) => Promise<unknown>, private readonly report: (error: unknown) => void, private readonly state: () => { hasFile: boolean; loggedIn: boolean; assistants: readonly Assistant[] }) {}
+  constructor(private readonly context: vscode.ExtensionContext, private readonly action: (command: string, ...args: unknown[]) => Promise<unknown>, private readonly report: (error: unknown) => void, private readonly state: () => { hasFile: boolean; loggedIn: boolean; assistants: readonly Assistant[] }) {}
   provideTextDocumentContent(uri: vscode.Uri): string { return this.contents.get(uri.toString()) ?? '内容已失效，请重新打开。'; }
   resolveWebviewView(view: vscode.WebviewView): void {
     this.view = view;
@@ -99,8 +105,13 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
         if (message.type === 'tab' && ['problem', 'result', 'contest', 'rank'].includes(message.kind)) {
           const entry = this.entries.get(message.kind); if (entry) { this.active = entry; this.render(); } return;
         }
+        const extras = this.active?.extras;
+        if (message.type === 'item') {
+          if (extras?.itemAction && extras.items?.some(item => item.arg === message.arg)) { await this.action(extras.itemAction, message.arg); } return;
+        }
         if (message.type !== 'action') { return; }
         if (message.action === 'open-file') { await this.openAsFile(); }
+        else if (extras?.buttons?.some(button => button.action === message.action)) { await this.action(message.action); }
         else if (['hoj-connecter.attachToCodex', 'hoj-connecter.attachToClaude', 'hoj-connecter.attachToCopilot'].includes(message.action) && this.active?.attachment) { await this.action(message.action); }
         else if (['hoj-connecter.fetchLastAcceptedCode', 'hoj-connecter.resetToTemplate'].includes(message.action)) {
           const state = this.state();
@@ -114,9 +125,9 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
     }));
     this.render(); this.sidebarChanged.fire();
   }
-  async show(id: string, title: string, content: string, kind: DetailKind = 'problem', reveal = true, attachment?: DetailAttachment): Promise<void> {
+  async show(id: string, title: string, content: string, kind: DetailKind = 'problem', reveal = true, attachment?: DetailAttachment, extras?: DetailExtras): Promise<void> {
     if (kind === 'problem' && this.entries.get('problem')?.id !== id) { this.entries.delete('result'); }
-    const entry = { id, title, content, kind, attachment }; this.entries.set(kind, entry);
+    const entry = { id, title, content, kind, attachment, extras }; this.entries.set(kind, entry);
     if (reveal || !this.active || (this.active.kind === kind && this.active.id === id)) { this.active = entry; }
     this.render();
     void vscode.commands.executeCommand('setContext', 'hoj-connecter.hasDetail', true);
@@ -172,7 +183,7 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
       void vscode.commands.executeCommand('setContext', `hoj-connecter.canAttachTo${name}`, !!this.active?.attachment && state.assistants.some(a => a.name === name));
     }
     if (!this.view) { return; }
-    const signature = JSON.stringify([this.active?.id, this.active?.content, !!this.active?.attachment, [...this.entries].map(([kind, entry]) => [kind, entry.id]), state]);
+    const signature = JSON.stringify([this.active?.id, this.active?.content, !!this.active?.attachment, this.active?.extras, [...this.entries].map(([kind, entry]) => [kind, entry.id]), state]);
     // Reassigning identical HTML cancels an iframe that may still be starting.
     if (signature === this.renderSignature) { return; }
     this.renderSignature = signature; this.rendered = undefined;
@@ -182,8 +193,12 @@ export class Documents implements vscode.TextDocumentContentProvider, vscode.Web
     const katexCss = webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', 'katex', 'katex.min.css'));
     const tabs = [...this.entries.values()].map(e => `<button class="tab ${this.active?.kind === e.kind ? 'selected' : ''}" data-tab="${e.kind}" aria-pressed="${this.active?.kind === e.kind}">${{ problem: '题面', result: '结果', contest: '比赛', rank: '排行' }[e.kind]}</button>`).join('');
     const actions = this.active?.kind === 'problem' ? state.hasFile ? `<button data-action="hoj-connecter.openSolution">打开代码</button><button data-action="${state.loggedIn ? 'hoj-connecter.submit' : 'hoj-connecter.login'}">${state.loggedIn ? '提交' : '登录'}</button><button data-action="hoj-connecter.testSamples">测试样例</button><button data-action="hoj-connecter.fetchLastAcceptedCode" ${state.loggedIn ? '' : 'disabled'} title="${state.loggedIn ? '获取当前账号的通过代码，将覆盖当前代码' : '请先登录'}">获取最后一次通过的代码</button><button data-action="hoj-connecter.resetToTemplate" title="使用当前语言的模板覆盖当前代码">重置为模板</button>` : '<button data-action="hoj-connecter.newSolution">新建代码</button><button data-action="hoj-connecter.bindActiveFile">关联当前文件</button>' : this.active?.kind === 'rank' ? '<button data-action="hoj-connecter.rankPrevious">‹ 上一页</button><button data-action="hoj-connecter.rankNext">下一页 ›</button><button data-action="hoj-connecter.rankSearch">搜索用户</button><button data-action="hoj-connecter.rankMe" title="按当前账号用户名搜索">定位到我</button><button data-action="hoj-connecter.rankRefresh">刷新</button>' : this.active?.id.startsWith('samples-') ? '<button data-action="hoj-connecter.showTests">测试面板</button>' : '';
+    const extras = this.active?.extras;
+    const extraButtons = (extras?.buttons ?? []).map(b => `<button data-action="${escapeHtml(b.action)}"${b.title ? ` title="${escapeHtml(b.title)}"` : ''}>${escapeHtml(b.label)}</button>`).join('');
+    const items = extras?.items || extras?.itemsTitle ? `<section class="items"><h2>${escapeHtml(extras.itemsTitle ?? '')}</h2>${(extras.items ?? []).map(i => `<button class="item ${i.state ?? ''}" data-item="${escapeHtml(i.arg)}"><span>${escapeHtml(i.label)}</span>${i.description ? `<small>${escapeHtml(i.description)}</small>` : ''}</button>`).join('')}</section>` : '';
+    const body = this.active ? renderMarkdown(this.active.content) : '';
     const assistantActions = this.active?.attachment ? state.assistants.map(a => `<button data-action="hoj-connecter.attachTo${a.name}" title="附加${this.active!.kind === 'result' ? '错误信息、代码和题面' : '题面和相关代码'}到 ${a.name} 输入区">附加到 ${a.name}</button>`).join('') : '';
-    webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data:; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${css}"><link rel="stylesheet" href="${katexCss}"><title>${escapeHtml(this.active?.title ?? '题面与结果')}</title></head><body data-entry-id="${escapeHtml(this.active?.id ?? '')}"><header><nav aria-label="内容切换">${tabs}</nav>${this.active ? '<button class="file" data-action="open-file" title="在编辑区以 Markdown 文件打开">以文件打开 ↗</button>' : ''}</header><main>${this.active ? renderMarkdown(this.active.content) : '<p class="empty">在左侧 OJ 导航中选择一道题，题面和评测结果将在右侧显示。</p>'}</main>${this.active ? `<footer>${actions}${assistantActions}</footer>` : ''}<script nonce="${nonce}">const vscode=acquireVsCodeApi();const entryId=document.body.dataset.entryId;vscode.postMessage({type:'ready',entryId,version:${version},heading:document.querySelector('main h1')?.textContent||''});const state=vscode.getState();if(state?.entryId===entryId)requestAnimationFrame(()=>window.scrollTo(0,state.scrollY||0));document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.tab)vscode.postMessage({type:'tab',kind:b.dataset.tab,entryId});else if(b.dataset.action)vscode.postMessage({type:'action',action:b.dataset.action,entryId});});window.addEventListener('scroll',()=>vscode.setState({entryId,scrollY:window.scrollY}),{passive:true});</script></body></html>`;
+    webview.html = `<!doctype html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src https: http: data:; font-src ${webview.cspSource}; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';"><link rel="stylesheet" href="${css}"><link rel="stylesheet" href="${katexCss}"><title>${escapeHtml(this.active?.title ?? '题面与结果')}</title></head><body data-entry-id="${escapeHtml(this.active?.id ?? '')}"><header><nav aria-label="内容切换">${tabs}</nav>${this.active ? '<button class="file" data-action="open-file" title="在编辑区以 Markdown 文件打开">以文件打开 ↗</button>' : ''}</header><main>${this.active ? (/<\/h1>/.test(body) ? body.replace(/<\/h1>/, m => m + items) : items + body) : '<p class="empty">在左侧 OJ 导航中选择一道题，题面和评测结果将在右侧显示。</p>'}</main>${this.active ? `<footer>${actions}${extraButtons}${assistantActions}</footer>` : ''}<script nonce="${nonce}">const vscode=acquireVsCodeApi();const entryId=document.body.dataset.entryId;vscode.postMessage({type:'ready',entryId,version:${version},heading:document.querySelector('main h1')?.textContent||''});const state=vscode.getState();if(state?.entryId===entryId)requestAnimationFrame(()=>window.scrollTo(0,state.scrollY||0));document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.tab)vscode.postMessage({type:'tab',kind:b.dataset.tab,entryId});else if(b.dataset.action)vscode.postMessage({type:'action',action:b.dataset.action,entryId});else if(b.dataset.item!==undefined)vscode.postMessage({type:'item',arg:b.dataset.item,entryId});});window.addEventListener('scroll',()=>vscode.setState({entryId,scrollY:window.scrollY}),{passive:true});</script></body></html>`;
   }
   dispose(): void { this.disposed = true; this.sidebarChanged.fire(); this.subscriptions.forEach(s => s.dispose()); this.sidebarChanged.dispose(); this.changed.dispose(); this.contents.clear(); this.entries.clear(); }
 }

@@ -162,6 +162,13 @@
         "icon": "$(graph)"
       },
       {
+        "command": "hoj-connecter.contestRank",
+        "title": "当前比赛排行榜",
+        "category": "HOJ-Connecter",
+        "icon": "$(graph)",
+        "enablement": "hoj-connecter.inContest"
+      },
+      {
         "command": "hoj-connecter.filterSubmissions",
         "title": "筛选提交",
         "category": "HOJ-Connecter",
@@ -456,6 +463,11 @@
           "command": "hoj-connecter.openDetailAsFile",
           "when": "view == hoj-connecter.details && hoj-connecter.hasDetail",
           "group": "navigation@2"
+        },
+        {
+          "command": "hoj-connecter.contestRank",
+          "when": "view == hoj-connecter.details && hoj-connecter.inContest",
+          "group": "navigation@0"
         },
         {
           "command": "hoj-connecter.showProblem",

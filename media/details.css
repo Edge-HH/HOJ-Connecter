@@ -22,3 +22,12 @@ blockquote { border-left: 3px solid var(--vscode-textBlockQuote-border); padding
 .math-block, .katex-display { overflow-x: auto; overflow-y: hidden; }
 .empty { color: var(--vscode-descriptionForeground); padding-top: 15px; }
 footer { position: sticky; bottom: 0; display: flex; flex-wrap: wrap; gap: 5px; padding: 8px 10px; background: var(--vscode-sideBar-background); border-top: 1px solid var(--vscode-panel-border); }
+.items { margin: 6px 0 14px; display: flex; flex-direction: column; gap: 3px; }
+.items h2 { border-top: none; padding-top: 0; margin: 6px 0 4px; }
+.item { display: flex; justify-content: space-between; gap: 10px; text-align: left; padding: 6px 9px; border-left: 3px solid transparent; }
+.item small { color: var(--vscode-descriptionForeground); white-space: nowrap; }
+.item.ac { border-left-color: var(--vscode-testing-iconPassed); }
+.item.ac small { color: var(--vscode-testing-iconPassed); }
+.item.failed { border-left-color: var(--vscode-testing-iconFailed); }
+.item.failed small { color: var(--vscode-testing-iconFailed); }
+.item.pending { border-left-color: var(--vscode-progressBar-background); }
